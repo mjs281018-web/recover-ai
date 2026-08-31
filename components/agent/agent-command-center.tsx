@@ -33,6 +33,7 @@ import { ProbabilityBar } from '@/components/ui/probability-bar'
 import { formatCompactCurrency, formatCurrency, formatPercent } from '@/lib/format'
 import { AGENT_PIPELINE, type PipelineStageKey } from '@/lib/recovery-pipeline'
 import { resetRecoveryRun, runRecoveryStage, type RecoveryStageSnapshot } from '@/services/agent-service'
+import { decideApproval } from '@/services/approval-service'
 import { RECOVERY_ACTION_LABELS } from '@/types'
 import type { AgentEvent, AgentDecision, AgentState, Payment, PolicyEvaluation, Prediction } from '@/types'
 
@@ -198,6 +199,7 @@ export function AgentCommandCenter({
   const [hoveredFlow, setHoveredFlow] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+  const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending')
 
   const playingRef = useRef(false)
   const executedRef = useRef(0)
@@ -268,7 +270,7 @@ export function AgentCommandCenter({
       return next
     })
     setExecutedCount(index + 1)
-    setHighlightIndex(index)
+    setHighlightIndex(index + 1 >= AGENT_PIPELINE.length ? -1 : index)
     setSessionEvents((prev) => [snapshot.agentEvent, ...prev])
     return executedRef.current < AGENT_PIPELINE.length
   }
@@ -484,7 +486,7 @@ export function AgentCommandCenter({
                               : 'border-border-strong bg-surface text-muted-foreground',
                         )}
                       >
-                        {done && !active ? <Check className="size-4" /> : <Icon className="size-4" />}
+                        {done ? <Check className="size-4" /> : <Icon className="size-4" />}
                       </div>
                       {active && (
                         <span className="absolute mt-12 flex size-1.5">

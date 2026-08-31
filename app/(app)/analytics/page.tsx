@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Lightbulb, AlertOctagon } from 'lucide-react'
+import { TrendingUp, TrendingDown, Lightbulb, OctagonAlert as AlertOctagon } from 'lucide-react'
 import { PageContainer } from '@/components/foundation/page-container'
 import { SectionHeader } from '@/components/ui/section-header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'

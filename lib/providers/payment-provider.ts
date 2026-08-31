@@ -17,6 +17,17 @@ import { demoPayments, demoRecoveryOutcomes, demoCustomers } from '@/data/demo'
 
 export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER — SYNTHETIC'
 
+/** Original payment rows captured before a session mutation, keyed by payment id. */
+const paymentSnapshots = new Map<string, Payment>()
+/** Outcome ids appended during this session so Reset can drop them. */
+const sessionOutcomeIds = new Set<string>()
+
+function rememberPayment(payment: Payment) {
+  if (!paymentSnapshots.has(payment.id)) {
+    paymentSnapshots.set(payment.id, { ...payment })
+  }
+}
+
 export interface PaymentProvider {
   /** Fetch a single payment by id. */
   getPayment(paymentId: string): Promise<Payment | undefined>
@@ -52,9 +63,42 @@ export class SyntheticPaymentProvider implements PaymentProvider {
     if (!payment) {
       return { ok: false, message: `No synthetic payment found for ${paymentId}.` }
     }
+    if (payment.status === 'recovered') {
+      return {
+        ok: true,
+        message: `Payment ${paymentId} is already recovered — no synthetic retry was attempted.`,
+      }
+    }
+    if (payment.status === 'blocked') {
+      return {
+        ok: false,
+        message: `Payment ${paymentId} is blocked — synthetic retries are not permitted.`,
+      }
+    }
+    if (payment.status === 'pending-approval') {
+      return {
+        ok: false,
+        message: `Payment ${paymentId} is awaiting human approval — synthetic retry was not executed.`,
+      }
+    }
+
+    rememberPayment(payment)
+    payment.attempts += 1
+    payment.updatedAt = new Date().toISOString()
+
+    const ok = payment.recoveryProbability >= 0.5
+    if (ok) {
+      payment.status = 'recovered'
+      return {
+        ok: true,
+        message: `Synthetic retry succeeded for ${paymentId} — in-memory status set to recovered. No real charge was attempted.`,
+      }
+    }
+
+    payment.status = 'failed'
     return {
-      ok: payment.recoveryProbability >= 0.5,
-      message: `Synthetic retry simulated for ${paymentId} — no real charge was attempted.`,
+      ok: false,
+      message: `Synthetic retry did not recover ${paymentId} — in-memory status set to failed. No real charge was attempted.`,
     }
   }
 
@@ -64,7 +108,31 @@ export class SyntheticPaymentProvider implements PaymentProvider {
 
   async recordRecoveryOutcome(outcome: RecoveryOutcome): Promise<RecoveryOutcome> {
     demoRecoveryOutcomes.push(outcome)
+    sessionOutcomeIds.add(outcome.id)
     return outcome
+  }
+}
+
+/**
+ * Restore a payment (and session-appended outcomes for it) to the demo seed.
+ * Session-only — nothing is written to disk.
+ */
+export async function resetSyntheticSimulation(paymentId: string): Promise<void> {
+  const original = paymentSnapshots.get(paymentId)
+  if (original) {
+    const index = demoPayments.findIndex((p) => p.id === paymentId)
+    if (index >= 0) {
+      demoPayments[index] = { ...original }
+    }
+    paymentSnapshots.delete(paymentId)
+  }
+
+  for (let i = demoRecoveryOutcomes.length - 1; i >= 0; i--) {
+    const outcome = demoRecoveryOutcomes[i]
+    if (sessionOutcomeIds.has(outcome.id) && outcome.paymentId === paymentId) {
+      demoRecoveryOutcomes.splice(i, 1)
+      sessionOutcomeIds.delete(outcome.id)
+    }
   }
 }
 

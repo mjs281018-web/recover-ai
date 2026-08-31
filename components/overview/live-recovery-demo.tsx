@@ -31,8 +31,8 @@ function buildSteps(paymentId: string): DemoStep[] {
     { pipelineStage: 'policy-check', title: 'Policy check', description: 'Standard auto-retry policy (PL-01) — passed, no approval required', delayMs: 550 },
     { pipelineStage: 'act', title: 'Recovery action executed', description: 'Retry submitted over UPI', delayMs: 700 },
     { pipelineStage: 'verify', title: 'Payment result verified', description: 'Gateway confirmed the retry succeeded', delayMs: 550 },
-    { pipelineStage: 'log', title: 'Audit event recorded', description: 'Action, decision, and outcome written to the audit trail', delayMs: 400 },
-    { pipelineStage: 'log', title: 'Revenue KPIs updated', description: 'Revenue Recovered, Recovery Rate, and agent activity refreshed', delayMs: 400 },
+    { pipelineStage: 'audit', title: 'Audit event recorded', description: 'Action, decision, and outcome written to the audit trail', delayMs: 400 },
+    { pipelineStage: 'audit', title: 'Revenue KPIs updated', description: 'Revenue Recovered, Recovery Rate, and agent activity refreshed', delayMs: 400 },
   ]
 }
 

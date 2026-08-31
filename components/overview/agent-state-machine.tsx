@@ -1,17 +1,7 @@
 import { cn } from '@/lib/utils'
+import { AGENT_PIPELINE, type PipelineStageKey } from '@/lib/recovery-pipeline'
 
-export const AGENT_PIPELINE = [
-  { key: 'observe', label: 'Observe' },
-  { key: 'analyze', label: 'Analyze' },
-  { key: 'predict', label: 'Predict' },
-  { key: 'decide', label: 'Decide' },
-  { key: 'policy-check', label: 'Policy check' },
-  { key: 'act', label: 'Act' },
-  { key: 'verify', label: 'Verify' },
-  { key: 'log', label: 'Log' },
-] as const
-
-export type PipelineStageKey = (typeof AGENT_PIPELINE)[number]['key']
+export { AGENT_PIPELINE, type PipelineStageKey } from '@/lib/recovery-pipeline'
 
 export function AgentStateMachine({ activeStage }: { activeStage: PipelineStageKey | null }) {
   const activeIndex = activeStage ? AGENT_PIPELINE.findIndex((p) => p.key === activeStage) : -1

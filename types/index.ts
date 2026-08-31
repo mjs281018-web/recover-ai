@@ -248,6 +248,18 @@ export interface Policy {
   updatedBy: AuditActor
 }
 
+export type PolicyVerdict = 'allowed' | 'requiresApproval' | 'blocked'
+
+/** Result of evaluating active demo policies against a payment + intended action. */
+export interface PolicyEvaluation {
+  verdict: PolicyVerdict
+  allowed: boolean
+  requiresApproval: boolean
+  blocked: boolean
+  policyId: string
+  reason: string
+}
+
 export interface Approval {
   id: string
   paymentId: string

@@ -3,17 +3,28 @@ import { SectionHeader } from '@/components/ui/section-header'
 import { Badge } from '@/components/ui/badge'
 import { AgentCommandCenter } from '@/components/agent/agent-command-center'
 import { listAgentEvents, listAgentDecisions, listPredictions, getAgentState } from '@/services/agent-service'
-import { getHeadlineMetrics, getSecondaryMetrics } from '@/services/analytics-service'
+import { getHeadlineMetrics, getSecondaryMetrics, getRecoveryFunnel } from '@/services/analytics-service'
+import { getPayment } from '@/services/payment-service'
+import { DEMO_SIMULATION_PAYMENT_IDS } from '@/lib/recovery-pipeline'
+import type { Payment } from '@/types'
 
 export default async function AgentPage() {
-  const [events, decisions, predictions, state, metrics, secondaryMetrics] = await Promise.all([
+  const [events, decisions, predictions, state, metrics, secondaryMetrics, funnel] = await Promise.all([
     listAgentEvents(10),
     listAgentDecisions(),
     listPredictions(),
     getAgentState(),
     getHeadlineMetrics(),
     getSecondaryMetrics(),
+    getRecoveryFunnel(),
   ])
+
+  const simulationPayments = (
+    await Promise.all(DEMO_SIMULATION_PAYMENT_IDS.map((id) => getPayment(id)))
+  ).filter((payment): payment is Payment => payment !== undefined)
+
+  const atRiskStage = funnel.find((stage) => stage.key === 'at-risk')
+  const recoveredStage = funnel.find((stage) => stage.key === 'recovered')
 
   return (
     <PageContainer className="max-w-[1400px]">
@@ -39,6 +50,8 @@ export default async function AgentPage() {
         events={events}
         decisions={decisions}
         predictions={predictions}
+        simulationPayments={simulationPayments}
+        initialAgentState={state}
         metrics={{
           aiActionsExecuted: secondaryMetrics.aiActionsExecuted,
           humanEscalations: secondaryMetrics.humanEscalations,
@@ -46,6 +59,8 @@ export default async function AgentPage() {
           averageRecoveryTimeMinutes: secondaryMetrics.averageRecoveryTimeMinutes,
           revenueRecovered: metrics.revenueRecovered,
           recoveryRate: metrics.recoveryRate,
+          paymentsAnalyzed: atRiskStage?.paymentCount ?? 0,
+          successfulRecoveries: recoveredStage?.paymentCount ?? 0,
         }}
       />
     </PageContainer>

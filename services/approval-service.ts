@@ -11,12 +11,24 @@ export async function listApprovals(status?: ApprovalStatus): Promise<Approval[]
   return [...approvals].sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1))
 }
 
+export async function getApprovalForPayment(paymentId: string): Promise<Approval | undefined> {
+  return demoApprovals.find((approval) => approval.paymentId === paymentId)
+}
+
+export async function resetApprovalDecision(paymentId: string): Promise<void> {
+  const approval = await getApprovalForPayment(paymentId)
+  if (!approval) return
+  approval.status = 'pending'
+  delete approval.decidedAt
+  delete approval.decidedBy
+}
+
 export async function decideApproval(
   approvalId: string,
   decision: 'approved' | 'rejected',
 ): Promise<Approval | undefined> {
   const approval = demoApprovals.find((a) => a.id === approvalId)
-  if (!approval) return undefined
+  if (!approval || approval.status !== 'pending') return approval
   approval.status = decision
   approval.decidedAt = new Date().toISOString()
   approval.decidedBy = 'human'

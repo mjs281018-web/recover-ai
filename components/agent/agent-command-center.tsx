@@ -32,10 +32,15 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { ProbabilityBar } from '@/components/ui/probability-bar'
 import { formatCompactCurrency, formatCurrency, formatPercent } from '@/lib/format'
 import { AGENT_PIPELINE, type PipelineStageKey } from '@/lib/recovery-pipeline'
-import { resetRecoveryRun, runRecoveryStage, type RecoveryStageSnapshot } from '@/services/agent-service'
+import {
+  decideRecoveryApproval,
+  resetRecoveryRun,
+  runRecoveryStage,
+  type RecoveryStageSnapshot,
+} from '@/services/agent-service'
 import { decideApproval } from '@/services/approval-service'
 import { RECOVERY_ACTION_LABELS } from '@/types'
-import type { AgentEvent, AgentDecision, AgentState, Payment, PolicyEvaluation, Prediction } from '@/types'
+import type { AgentEvent, AgentDecision, AgentState, Approval, ApprovalStatus, Payment, PolicyEvaluation, Prediction } from '@/types'
 
 const KIND_ICON: Record<AgentEvent['kind'], React.ComponentType<{ className?: string }>> = {
   analysis: Eye,
@@ -168,6 +173,7 @@ export interface AgentCommandCenterProps {
   decisions: AgentDecision[]
   predictions: Prediction[]
   simulationPayments: Payment[]
+  approvals: Approval[]
   initialAgentState: AgentState
   metrics: {
     aiActionsExecuted: number
@@ -186,6 +192,7 @@ export function AgentCommandCenter({
   decisions,
   predictions,
   simulationPayments,
+  approvals,
   initialAgentState,
   metrics,
 }: AgentCommandCenterProps) {
@@ -199,12 +206,17 @@ export function AgentCommandCenter({
   const [hoveredFlow, setHoveredFlow] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
-  const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(
+    approvals.find((approval) => approval.paymentId === defaultPaymentId)?.status ?? 'pending',
+  )
+  const [approvalResolved, setApprovalResolved] = useState(false)
 
   const playingRef = useRef(false)
   const executedRef = useRef(0)
   const selectedRef = useRef(selectedPaymentId)
   const runIdRef = useRef(0)
+
+  const selectedApproval = approvals.find((approval) => approval.paymentId === selectedPaymentId)
 
   const selectedPayment =
     latestOf(snapshots, (s) => (s.paymentId === selectedPaymentId ? s.payment : undefined)) ??
@@ -258,9 +270,9 @@ export function AgentCommandCenter({
     : 0
   const mode = modeLabel(liveAgentState)
 
-  async function executeNextStage(): Promise<boolean> {
+  async function executeNextStage(): Promise<'continue' | 'waiting' | 'done'> {
     const index = executedRef.current
-    if (index >= AGENT_PIPELINE.length) return false
+    if (index >= AGENT_PIPELINE.length) return 'done'
     const stage = AGENT_PIPELINE[index].key
     const snapshot = await runRecoveryStage(selectedRef.current, stage)
     executedRef.current = index + 1
@@ -272,7 +284,11 @@ export function AgentCommandCenter({
     setExecutedCount(index + 1)
     setHighlightIndex(index + 1 >= AGENT_PIPELINE.length ? -1 : index)
     setSessionEvents((prev) => [snapshot.agentEvent, ...prev])
-    return executedRef.current < AGENT_PIPELINE.length
+    if (snapshot.policyEvaluation?.requiresApproval && snapshot.approval?.status === 'pending') {
+      playingRef.current = false
+      return 'waiting'
+    }
+    return executedRef.current < AGENT_PIPELINE.length ? 'continue' : 'done'
   }
 
   async function handleStep() {
@@ -281,8 +297,8 @@ export function AgentCommandCenter({
     setBusy(true)
     setPlayback('paused')
     try {
-      const hasMore = await executeNextStage()
-      setPlayback(hasMore ? 'paused' : 'done')
+      const result = await executeNextStage()
+      setPlayback(result === 'done' ? 'done' : 'paused')
     } finally {
       setBusy(false)
     }
@@ -296,16 +312,15 @@ export function AgentCommandCenter({
     setPlayback('playing')
     setBusy(true)
     try {
+      let result: 'continue' | 'waiting' | 'done' = 'continue'
       while (playingRef.current && executedRef.current < AGENT_PIPELINE.length && runIdRef.current === runId) {
-        await executeNextStage()
-        if (!playingRef.current || runIdRef.current !== runId) break
-        if (executedRef.current < AGENT_PIPELINE.length) {
-          await wait(STAGE_DELAY_MS)
-        }
+        result = await executeNextStage()
+        if (result !== 'continue' || !playingRef.current || runIdRef.current !== runId) break
+        await wait(STAGE_DELAY_MS)
       }
       if (runIdRef.current === runId) {
         playingRef.current = false
-        setPlayback(executedRef.current >= AGENT_PIPELINE.length ? 'done' : 'paused')
+        setPlayback(result === 'done' ? 'done' : 'paused')
       }
     } finally {
       if (runIdRef.current === runId) setBusy(false)
@@ -329,6 +344,8 @@ export function AgentCommandCenter({
     setHighlightIndex(-1)
     setSessionEvents([])
     setExpandedEvent(null)
+    setApprovalStatus('pending')
+    setApprovalResolved(false)
     setPlayback('idle')
     setBusy(false)
   }
@@ -348,6 +365,48 @@ export function AgentCommandCenter({
   const canPlay = !busy && !finished && playback !== 'playing'
   const canStep = !busy && !finished && playback !== 'playing'
   const canPause = playback === 'playing'
+
+  const isAwaitingApproval =
+    approvalStatus === 'pending' &&
+    selectedApproval !== undefined &&
+    policyEvaluation?.requiresApproval === true
+
+  async function handleApproval(decision: 'approved' | 'rejected') {
+    if (!selectedApproval || approvalStatus !== 'pending' || busy) return
+    playingRef.current = false
+    runIdRef.current += 1
+    setBusy(true)
+    const approval = await decideRecoveryApproval(selectedPaymentId, selectedApproval.id, decision)
+    if (!approval) {
+      setBusy(false)
+      return
+    }
+    setApprovalStatus(approval.status)
+    setApprovalResolved(true)
+    if (decision === 'rejected') {
+      setPlayback('paused')
+      setBusy(false)
+      return
+    }
+
+    const runId = ++runIdRef.current
+    playingRef.current = true
+    setPlayback('playing')
+    try {
+      let result: 'continue' | 'waiting' | 'done' = 'continue'
+      while (playingRef.current && executedRef.current < AGENT_PIPELINE.length && runIdRef.current === runId) {
+        result = await executeNextStage()
+        if (result !== 'continue' || !playingRef.current || runIdRef.current !== runId) break
+        await wait(STAGE_DELAY_MS)
+      }
+      if (runIdRef.current === runId) {
+        playingRef.current = false
+        setPlayback(result === 'done' ? 'done' : 'paused')
+      }
+    } finally {
+      if (runIdRef.current === runId) setBusy(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -440,6 +499,54 @@ export function AgentCommandCenter({
                 </span>
               )}
             </div>
+
+            {isAwaitingApproval && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/25 bg-warning-muted/30 px-3 py-2.5">
+                <ShieldAlert className="size-4 shrink-0 text-warning" />
+                <span className="text-sm font-medium text-warning">
+                  Awaiting human approval{selectedApproval ? ` · ${selectedApproval.id}` : ''}
+                </span>
+                <span className="text-xs text-muted-foreground">{selectedApproval?.reason}</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleApproval('approved')}
+                    disabled={busy}
+                    className="gap-1.5"
+                  >
+                    <Check className="size-3.5" />
+                    Approve
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => void handleApproval('rejected')}
+                    disabled={busy}
+                    className="gap-1.5"
+                  >
+                    <ShieldOff className="size-3.5" />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {approvalStatus === 'rejected' && approvalResolved && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-muted/30 px-3 py-2.5">
+                <ShieldOff className="size-4 shrink-0 text-danger" />
+                <span className="text-sm font-medium text-danger">Approval rejected — recovery halted.</span>
+                <span className="text-xs text-muted-foreground">No retry was executed. Rejection recorded in the audit trail.</span>
+              </div>
+            )}
+
+            {approvalStatus === 'approved' && approvalResolved && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/25 bg-success-muted/30 px-3 py-2.5">
+                <ShieldCheck className="size-4 shrink-0 text-success" />
+                <span className="text-sm font-medium text-success">Approval granted — resuming recovery.</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

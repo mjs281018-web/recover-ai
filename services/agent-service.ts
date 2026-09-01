@@ -7,6 +7,7 @@
 import type {
   AgentDecision,
   AgentEvent,
+  Approval,
   AgentEventKind,
   AgentState,
   AuditEvent,
@@ -25,7 +26,12 @@ import { resetSyntheticSimulation } from '@/lib/providers/payment-provider'
 import { getPayment, retryPayment } from '@/services/payment-service'
 import { getCustomer } from '@/services/customer-service'
 import { listStrategies, listRecoveryOutcomes, recordRecoveryOutcome } from '@/services/recovery-service'
-import { listApprovals } from '@/services/approval-service'
+import {
+  decideApproval,
+  getApprovalForPayment,
+  listApprovals,
+  resetApprovalDecision,
+} from '@/services/approval-service'
 import { evaluatePolicy } from '@/services/policy-service'
 import { recordAuditEvent, resetSessionAuditEvents } from '@/services/audit-service'
 
@@ -58,6 +64,7 @@ export interface RecoveryStageSnapshot {
   actResult?: RecoveryActResult
   verifyResult?: RecoveryVerifyResult
   auditEvent?: AuditEvent
+  approval?: Approval
 }
 
 export async function listAgentEvents(limit?: number): Promise<AgentEvent[]> {
@@ -192,6 +199,28 @@ async function emitSnapshot(snapshot: Omit<RecoveryStageSnapshot, 'agentEvent'> 
  * Execute a single lifecycle stage for an existing demo payment.
  * Composes payment, customer, prediction, decision, policy, recovery, and audit services.
  */
+export async function decideRecoveryApproval(
+  paymentId: string,
+  approvalId: string,
+  decision: 'approved' | 'rejected',
+): Promise<Approval | undefined> {
+  const approval = await decideApproval(approvalId, decision)
+  if (!approval || approval.paymentId !== paymentId) return undefined
+
+  if (decision === 'rejected') {
+    await recordAuditEvent({
+      id: `A-session-${paymentId}-rejected-${Date.now()}`,
+      actor: 'human',
+      action: 'Rejected recovery approval',
+      target: paymentId,
+      timestamp: clockLabel(),
+      status: 'failed',
+    })
+  }
+
+  return approval
+}
+
 export async function runRecoveryStage(
   paymentId: string,
   stage: PipelineStageKey,
@@ -284,6 +313,7 @@ export async function runRecoveryStage(
         : policyEvaluation.requiresApproval
           ? 'awaiting-approval'
           : 'analyzing'
+      const approval = policyEvaluation.requiresApproval ? await getApprovalForPayment(paymentId) : undefined
       return emitSnapshot({
         paymentId,
         stage,
@@ -293,6 +323,7 @@ export async function runRecoveryStage(
         agentState,
         decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
         policyEvaluation,
+        approval,
         prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(payment),
       })
     }
@@ -303,7 +334,19 @@ export async function runRecoveryStage(
       let actResult: RecoveryActResult
       let agentState: AgentState = 'executing'
 
-      if (payment.status === 'recovered') {
+      const approval = policyEvaluation.requiresApproval ? await getApprovalForPayment(paymentId) : undefined
+
+      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
+        actResult = {
+          kind: 'awaiting-approval',
+          ok: false,
+          message:
+            approval?.status === 'rejected'
+              ? `Recovery approval was rejected for ${payment.id} — no retry was executed.`
+              : `Awaiting human approval for ${payment.id} — no retry was executed.`,
+        }
+        agentState = approval?.status === 'rejected' ? 'paused' : 'awaiting-approval'
+      } else if (payment.status === 'recovered') {
         actResult = {
           kind: 'already-recovered',
           ok: true,
@@ -317,7 +360,7 @@ export async function runRecoveryStage(
           message: `Action blocked for ${payment.id}. ${policyEvaluation.reason}`,
         }
         agentState = 'paused'
-      } else if (policyEvaluation.requiresApproval || decision.recommendedAction === 'human-approval') {
+      } else if (decision.recommendedAction === 'human-approval' && approval?.status !== 'approved') {
         const pending = (await listApprovals('pending')).find((a) => a.paymentId === paymentId)
         actResult = {
           kind: 'awaiting-approval',
@@ -352,6 +395,7 @@ export async function runRecoveryStage(
           agentState,
           decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
           policyEvaluation,
+          approval,
           actResult,
           prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(latest),
         })
@@ -366,6 +410,7 @@ export async function runRecoveryStage(
         agentState,
         decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
         policyEvaluation,
+        approval,
         actResult,
         prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(payment),
       })
@@ -377,6 +422,10 @@ export async function runRecoveryStage(
       let outcome = outcomes[0]
       const { decision } = await resolveDecision(payment)
       const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
+      const approval = policyEvaluation.requiresApproval ? await getApprovalForPayment(paymentId) : undefined
+      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
+        throw new Error(`Recovery approval is not complete for ${paymentId}.`)
+      }
 
       if (latest.status === 'recovered' && !outcomes.some((o) => o.result === 'recovered')) {
         outcome = await recordRecoveryOutcome({
@@ -422,6 +471,10 @@ export async function runRecoveryStage(
       const latest = (await getPayment(paymentId)) ?? payment
       const { decision } = await resolveDecision(payment)
       const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
+      const approval = policyEvaluation.requiresApproval ? await getApprovalForPayment(paymentId) : undefined
+      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
+        throw new Error(`Recovery approval is not complete for ${paymentId}.`)
+      }
       const outcomes = await listRecoveryOutcomes(paymentId)
       const auditStatus: AuditEvent['status'] =
         latest.status === 'recovered' ||
@@ -451,6 +504,7 @@ export async function runRecoveryStage(
         agentState: 'idle',
         decision,
         policyEvaluation,
+        approval,
         auditEvent,
         verifyResult: {
           status: latest.status,
@@ -470,6 +524,7 @@ export async function runRecoveryStage(
 
 export async function resetRecoveryRun(paymentId: string): Promise<void> {
   await resetSyntheticSimulation(paymentId)
+  await resetApprovalDecision(paymentId)
   await resetSessionAuditEvents(paymentId)
 
   for (let i = demoAgentEvents.length - 1; i >= 0; i--) {

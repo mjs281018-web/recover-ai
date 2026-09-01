@@ -5,11 +5,12 @@ import { AgentCommandCenter } from '@/components/agent/agent-command-center'
 import { listAgentEvents, listAgentDecisions, listPredictions, getAgentState } from '@/services/agent-service'
 import { getHeadlineMetrics, getSecondaryMetrics, getRecoveryFunnel } from '@/services/analytics-service'
 import { getPayment } from '@/services/payment-service'
+import { listApprovals } from '@/services/approval-service'
 import { DEMO_SIMULATION_PAYMENT_IDS } from '@/lib/recovery-pipeline'
 import type { Payment } from '@/types'
 
 export default async function AgentPage() {
-  const [events, decisions, predictions, state, metrics, secondaryMetrics, funnel] = await Promise.all([
+  const [events, decisions, predictions, state, metrics, secondaryMetrics, funnel, approvals] = await Promise.all([
     listAgentEvents(10),
     listAgentDecisions(),
     listPredictions(),
@@ -17,6 +18,7 @@ export default async function AgentPage() {
     getHeadlineMetrics(),
     getSecondaryMetrics(),
     getRecoveryFunnel(),
+    listApprovals(),
   ])
 
   const simulationPayments = (
@@ -51,6 +53,7 @@ export default async function AgentPage() {
         decisions={decisions}
         predictions={predictions}
         simulationPayments={simulationPayments}
+        approvals={approvals}
         initialAgentState={state}
         metrics={{
           aiActionsExecuted: secondaryMetrics.aiActionsExecuted,

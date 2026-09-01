@@ -1,4 +1,3 @@
-import { BatchRecoverySimulator } from '@/components/batch/batch-recovery-simulator'
 import { PageContainer } from '@/components/foundation/page-container'
 import { SectionHeader } from '@/components/ui/section-header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -188,7 +187,6 @@ export default async function BatchPage() {
                 </div>
 
                 <ProbabilityBar value={batch.progress} />
-                <BatchRecoverySimulator batch={batch} />
 
               </CardContent>
 

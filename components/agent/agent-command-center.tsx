@@ -416,6 +416,8 @@ export function AgentCommandCenter({
   const executedRef = useRef(0)
   const selectedRef = useRef(selectedPaymentId)
   const runIdRef = useRef(0)
+  const snapshotsRef = useRef<RecoveryStageSnapshot[]>([])
+  const sessionStartedRef = useRef(false)
 
   const selectedApproval = approvals.find(
     (approval) => approval.paymentId === selectedPaymentId,
@@ -508,10 +510,9 @@ export function AgentCommandCenter({
       ? snapshots[highlightIndex]
       : undefined
 
-  const combinedEvents = [
-    ...sessionEvents,
-    ...events,
-  ].slice(0, 8)
+  const combinedEvents = sessionStartedRef.current
+    ? sessionEvents.slice(0, 8)
+    : [...sessionEvents, ...events].slice(0, 8)
 
   const activeEventId =
     expandedEvent ??
@@ -554,7 +555,7 @@ export function AgentCommandCenter({
 
     if (
       index > 0 &&
-      snapshots[index - 1]?.policyEvaluation?.blocked
+      snapshotsRef.current[index - 1]?.policyEvaluation?.blocked
     ) {
       playingRef.current = false
       return 'done'
@@ -566,6 +567,12 @@ export function AgentCommandCenter({
     )
 
     executedRef.current = index + 1
+
+    snapshotsRef.current = (() => {
+      const next = [...snapshotsRef.current]
+      next[index] = snapshot
+      return next
+    })()
 
     setSnapshots((prev) => {
       const next = [...prev]
@@ -580,6 +587,8 @@ export function AgentCommandCenter({
         ? -1
         : index,
     )
+
+    sessionStartedRef.current = true
 
     setSessionEvents((prev) => [
       snapshot.agentEvent,
@@ -710,6 +719,8 @@ export function AgentCommandCenter({
     await resetRecoveryRun(paymentId)
 
     executedRef.current = 0
+    snapshotsRef.current = []
+    sessionStartedRef.current = false
 
     setSnapshots([])
     setExecutedCount(0)
@@ -1166,6 +1177,11 @@ export function AgentCommandCenter({
           <div className="scrollbar-thin flex items-stretch gap-1 overflow-x-auto pb-2">
             {AGENT_PIPELINE.map((stage, i) => {
               const blocked = snapshots[i]?.policyEvaluation?.blocked === true
+              const blockedIndex = snapshots.findIndex(
+                (s) => s?.policyEvaluation?.blocked === true,
+              )
+              const stopped =
+                blockedIndex >= 0 && i > blockedIndex && i >= executedCount
               const done = i < executedCount && !blocked
 
               const active =
@@ -1182,7 +1198,11 @@ export function AgentCommandCenter({
                   className="flex items-stretch gap-1"
                 >
                   <Tooltip
-                    content={stage.description}
+                    content={
+                      stopped
+                        ? 'Stopped — recovery was blocked by policy'
+                        : stage.description
+                    }
                     side="bottom"
                   >
                     <button
@@ -1196,9 +1216,13 @@ export function AgentCommandCenter({
                         'group flex w-24 shrink-0 flex-col items-center gap-2 rounded-lg border p-3 text-center transition-all duration-300',
                         active
                           ? 'border-ai bg-ai-muted/60 shadow-[0_0_0_3px_var(--color-ai-muted)]'
-                          : done
-                            ? 'border-ai/30 bg-ai-muted/20 hover:border-ai/40'
-                            : 'border-border bg-surface hover:border-border-strong hover:bg-elevated',
+                          : blocked
+                            ? 'border-danger/40 bg-danger-muted/30'
+                            : done
+                              ? 'border-ai/30 bg-ai-muted/20 hover:border-ai/40'
+                              : stopped
+                                ? 'border-danger/20 bg-danger-muted/10 opacity-60'
+                                : 'border-border bg-surface hover:border-border-strong hover:bg-elevated',
                       )}
                     >
                       <div
@@ -1206,13 +1230,21 @@ export function AgentCommandCenter({
                           'flex size-9 shrink-0 items-center justify-center rounded-full border transition-all duration-300',
                           active
                             ? 'border-ai bg-ai text-ai-foreground'
-                            : done
-                              ? 'border-ai/40 bg-ai-muted text-ai'
-                              : 'border-border-strong bg-surface text-muted-foreground',
+                            : blocked
+                              ? 'border-danger/50 bg-danger-muted text-danger'
+                              : done
+                                ? 'border-ai/40 bg-ai-muted text-ai'
+                                : stopped
+                                  ? 'border-danger/25 bg-danger-muted/20 text-danger/60'
+                                  : 'border-border-strong bg-surface text-muted-foreground',
                         )}
                       >
                         {done ? (
                           <Check className="size-4" />
+                        ) : blocked ? (
+                          <ShieldOff className="size-4" />
+                        ) : stopped ? (
+                          <Lock className="size-4" />
                         ) : (
                           <Icon className="size-4" />
                         )}
@@ -1230,9 +1262,13 @@ export function AgentCommandCenter({
                           'text-[10px] font-semibold tracking-wide uppercase',
                           active
                             ? 'text-ai'
-                            : done
-                              ? 'text-foreground'
-                              : 'text-muted-foreground',
+                            : blocked
+                              ? 'text-danger'
+                              : done
+                                ? 'text-foreground'
+                                : stopped
+                                  ? 'text-danger/60'
+                                  : 'text-muted-foreground',
                         )}
                       >
                         {stage.label}
@@ -1248,7 +1284,9 @@ export function AgentCommandCenter({
                           'h-px w-3 shrink-0 transition-colors duration-300',
                           done
                             ? 'bg-ai/50'
-                            : 'bg-border',
+                            : blocked || stopped
+                              ? 'bg-danger/30'
+                              : 'bg-border',
                         )}
                       />
                     </div>
@@ -1257,6 +1295,28 @@ export function AgentCommandCenter({
               )
             })}
           </div>
+
+          {policyEvaluation?.blocked && (
+            <div className="mt-4 rounded-lg border border-danger/25 bg-danger-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldOff className="size-4 text-danger" />
+                  <span className="text-xs font-semibold tracking-wide text-danger uppercase">
+                    Recovery stopped by policy
+                  </span>
+                </div>
+                <Badge variant="danger">
+                  {policyEvaluation.policyId}
+                </Badge>
+              </div>
+              <p className="mt-1.5 text-sm font-medium text-foreground">
+                {policyEvaluation.reason}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Act, Verify, and Audit were not executed. No retry was attempted. The blocked reason remains visible above.
+              </p>
+            </div>
+          )}
 
           {highlighted && (
             <div className="mt-4 rounded-lg border border-ai/20 bg-ai-muted/20 p-4">

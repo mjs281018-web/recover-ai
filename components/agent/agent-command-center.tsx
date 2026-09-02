@@ -298,7 +298,9 @@ function buildDecisionExplanation(
   }
 
   const requiresApproval =
-    evaluation?.requiresApproval ?? decision.requiresApproval
+    evaluation?.blocked
+      ? false
+      : evaluation?.requiresApproval ?? decision.requiresApproval
 
   const policyText = evaluation
     ? `${evaluation.policyId}: ${evaluation.reason}`
@@ -922,14 +924,14 @@ export function AgentCommandCenter({
               <StatusPill
                 label="Policy Engine"
                 value={
-                  policyEvaluation?.requiresApproval
-                    ? 'Approval'
-                    : policyEvaluation?.blocked
-                      ? 'Blocked'
-                      : policyEvaluation
-                        ? 'Passed'
-                        : 'Online'
-                }
+    policyEvaluation?.blocked
+      ? 'Blocked'
+      : policyEvaluation?.requiresApproval
+        ? 'Approval'
+        : policyEvaluation
+          ? 'Passed'
+          : 'Online'
+  }
                 tone={
                   policyEvaluation?.blocked
                     ? 'danger'

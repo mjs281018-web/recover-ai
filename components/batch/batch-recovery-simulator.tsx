@@ -168,7 +168,193 @@ export function BatchRecoverySimulator({
                 </Badge>
               )}
             </div>
+            {/* Before / After Recovery Impact */}
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm font-medium">
+                  Recovery impact
+                </div>
 
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Measured revenue impact before and after the AI recovery workflow.
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* BEFORE */}
+                <div className="rounded-lg border p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      Before recovery
+                    </div>
+
+                    <Badge variant="outline">
+                      At risk
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Revenue at risk
+                      </div>
+
+                      <div className="mt-1 text-lg font-semibold tabular-nums">
+                        {formatCompactCurrency(result.totalAmount)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Payments requiring recovery
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {result.paymentsProcessed}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Recoverable amount
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {formatCompactCurrency(result.totalAmount)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ACTION */}
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      AI recovery action
+                    </div>
+
+                    <Badge variant="ai">
+                      Executed
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Recovery attempts
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {result.recoveryAttempts}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Human escalations
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {result.escalatedPayments}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Stopped by controls
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {result.stoppedPayments}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AFTER */}
+                <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      After recovery
+                    </div>
+
+                    <Badge variant="success">
+                      Measured
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Revenue recovered
+                      </div>
+
+                      <div className="mt-1 text-lg font-semibold tabular-nums text-success">
+                        {formatCompactCurrency(result.recoveredAmount)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Successful recoveries
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {result.recoveredPayments}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Remaining at risk
+                      </div>
+
+                      <div className="mt-1 font-medium tabular-nums">
+                        {formatCompactCurrency(result.pendingAmount)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recovery uplift */}
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-medium">
+                      Recovery uplift
+                    </div>
+
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Revenue recovered as a share of the value that was at risk.
+                    </div>
+                  </div>
+
+                  <div className="text-2xl font-semibold tabular-nums text-success">
+                    {result.recoveryRate.toFixed(1)}%
+                  </div>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-success transition-all"
+                    style={{
+                      width: `${Math.min(100, result.recoveryRate)}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    Before: {formatCompactCurrency(result.totalAmount)}
+                  </span>
+
+                  <span>
+                    After: {formatCompactCurrency(result.recoveredAmount)}
+                  </span>
+                </div>
+              </div>
+            </div>
             {/* Main recovery metrics */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div className="rounded-lg border p-3">

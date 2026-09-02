@@ -317,12 +317,12 @@ export function BatchRecoverySimulator({
                 </div>
               </div>
 
-              {/* Recovery uplift */}
+              {/* Recovery rate */}
               <div className="rounded-lg border bg-muted/20 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="text-sm font-medium">
-                      Recovery uplift
+                      Recovery rate
                     </div>
 
                     <div className="mt-1 text-xs text-muted-foreground">

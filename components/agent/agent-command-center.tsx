@@ -552,6 +552,14 @@ export function AgentCommandCenter({
 
     const stage = AGENT_PIPELINE[index].key
 
+    if (
+      index > 0 &&
+      snapshots[index - 1]?.policyEvaluation?.blocked
+    ) {
+      playingRef.current = false
+      return 'done'
+    }
+
     const snapshot = await runRecoveryStage(
       selectedRef.current,
       stage,
@@ -1152,7 +1160,8 @@ export function AgentCommandCenter({
         <CardContent className="pt-0">
           <div className="scrollbar-thin flex items-stretch gap-1 overflow-x-auto pb-2">
             {AGENT_PIPELINE.map((stage, i) => {
-              const done = i < executedCount
+              const blocked = snapshots[i]?.policyEvaluation?.blocked === true
+              const done = i < executedCount && !blocked
 
               const active =
                 i === highlightIndex ||
@@ -1514,14 +1523,16 @@ export function AgentCommandCenter({
                   <div
                     className={cn(
                       'mt-1 text-lg font-semibold',
-                      policyEvaluation?.requiresApproval ||
-                        featuredDecision.requiresApproval
+                      !policyEvaluation?.blocked &&
+                      (policyEvaluation?.requiresApproval ||
+                        featuredDecision.requiresApproval)
                         ? 'text-warning'
                         : 'text-muted-foreground',
                     )}
                   >
-                    {policyEvaluation?.requiresApproval ||
-                    featuredDecision.requiresApproval
+                    {!policyEvaluation?.blocked &&
+                    (policyEvaluation?.requiresApproval ||
+                    featuredDecision.requiresApproval)
                       ? 'Required'
                       : 'Not required'}
                   </div>

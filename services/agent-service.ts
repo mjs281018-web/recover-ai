@@ -405,7 +405,16 @@ export async function runRecoveryStage(
         paymentId,
         stage,
         payment,
-        title: `Acted on ${payment.id}`,
+        title:
+          policyEvaluation.blocked || payment.status === 'blocked'
+            ? `Action blocked for ${payment.id}`
+            : actResult.kind === 'awaiting-approval'
+              ? `Awaiting approval for ${payment.id}`
+              : actResult.kind === 'already-recovered'
+                ? `Already recovered ${payment.id}`
+                : actResult.kind === 'held'
+                  ? `Recovery held for ${payment.id}`
+                  : `Acted on ${payment.id}`,
         description: actResult.message,
         agentState,
         decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
@@ -535,3 +544,4 @@ export async function resetRecoveryRun(paymentId: string): Promise<void> {
     sessionAgentEventIds.delete(event.id)
   }
 }
+

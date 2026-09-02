@@ -586,6 +586,11 @@ export function AgentCommandCenter({
       ...prev,
     ])
 
+    if (snapshot.policyEvaluation?.blocked) {
+      playingRef.current = false
+      return 'done'
+    }
+
     if (
       snapshot.policyEvaluation?.requiresApproval &&
       snapshot.approval?.status === 'pending'
@@ -2317,3 +2322,4 @@ function StageExtras({
     </div>
   )
 }
+

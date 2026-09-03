@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Batch service — bulk recovery campaigns grouped by strategy. Wraps the
  * synthetic demo dataset for the foundation phase.
  */

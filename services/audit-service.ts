@@ -5,6 +5,7 @@
  */
 import type { AuditEvent, AuditActor } from '@/types'
 import { demoAuditEvents } from '@/data/demo'
+import { notifyRuntimeChange } from '@/lib/runtime-events'
 
 const sessionAuditIds = new Set<string>()
 
@@ -16,6 +17,7 @@ export async function listAuditEvents(actor?: AuditActor): Promise<AuditEvent[]>
 export async function recordAuditEvent(event: AuditEvent): Promise<AuditEvent> {
   demoAuditEvents.push(event)
   sessionAuditIds.add(event.id)
+  notifyRuntimeChange('audit-event', event.target)
   return event
 }
 

@@ -34,6 +34,7 @@ import {
 } from '@/services/approval-service'
 import { evaluatePolicy } from '@/services/policy-service'
 import { recordAuditEvent, resetSessionAuditEvents } from '@/services/audit-service'
+import { notifyRuntimeChange } from '@/lib/runtime-events'
 
 const sessionAgentEventIds = new Set<string>()
 
@@ -96,6 +97,7 @@ export async function getAgentState(): Promise<AgentState> {
 async function recordAgentEvent(event: AgentEvent): Promise<AgentEvent> {
   demoAgentEvents.push(event)
   sessionAgentEventIds.add(event.id)
+  notifyRuntimeChange('agent-event', event.paymentId)
   return event
 }
 

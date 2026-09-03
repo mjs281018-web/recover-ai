@@ -14,6 +14,7 @@
 
 import type { Payment, RecoveryOutcome } from '@/types'
 import { demoPayments, demoRecoveryOutcomes, demoCustomers } from '@/data/demo'
+import { notifyRuntimeChange } from '@/lib/runtime-events'
 
 export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER — SYNTHETIC'
 
@@ -89,6 +90,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
     const ok = payment.recoveryProbability >= 0.5
     if (ok) {
       payment.status = 'recovered'
+      notifyRuntimeChange('payment-updated', paymentId)
       return {
         ok: true,
         message: `Synthetic retry succeeded for ${paymentId} — in-memory status set to recovered. No real charge was attempted.`,
@@ -96,6 +98,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
     }
 
     payment.status = 'failed'
+    notifyRuntimeChange('payment-updated', paymentId)
     return {
       ok: false,
       message: `Synthetic retry did not recover ${paymentId} — in-memory status set to failed. No real charge was attempted.`,
@@ -109,6 +112,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
   async recordRecoveryOutcome(outcome: RecoveryOutcome): Promise<RecoveryOutcome> {
     demoRecoveryOutcomes.push(outcome)
     sessionOutcomeIds.add(outcome.id)
+    notifyRuntimeChange('recovery-action', outcome.paymentId)
     return outcome
   }
 }
@@ -134,6 +138,7 @@ export async function resetSyntheticSimulation(paymentId: string): Promise<void>
       sessionOutcomeIds.delete(outcome.id)
     }
   }
+  notifyRuntimeChange('reset', paymentId)
 }
 
 /** Confirms a customer id exists in the synthetic dataset (used by services). */

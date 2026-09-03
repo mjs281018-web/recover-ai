@@ -5,6 +5,7 @@
  */
 import type { Approval, ApprovalStatus } from '@/types'
 import { demoApprovals } from '@/data/demo'
+import { notifyRuntimeChange } from '@/lib/runtime-events'
 
 export async function listApprovals(status?: ApprovalStatus): Promise<Approval[]> {
   const approvals = status ? demoApprovals.filter((a) => a.status === status) : demoApprovals
@@ -21,6 +22,7 @@ export async function resetApprovalDecision(paymentId: string): Promise<void> {
   approval.status = 'pending'
   delete approval.decidedAt
   delete approval.decidedBy
+  notifyRuntimeChange('reset', paymentId)
 }
 
 export async function decideApproval(
@@ -32,5 +34,6 @@ export async function decideApproval(
   approval.status = decision
   approval.decidedAt = new Date().toISOString()
   approval.decidedBy = 'human'
+  notifyRuntimeChange('approval-decided', approval.paymentId)
   return approval
 }

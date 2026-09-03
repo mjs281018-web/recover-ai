@@ -25,6 +25,7 @@ import { RevenueTrendChart } from '@/components/overview/revenue-trend-chart'
 import { FailureBreakdownCard } from '@/components/overview/failure-breakdown-card'
 import { ChartFrame } from '@/components/charts/chart-frame'
 import { BarChart } from '@/components/charts/bar-chart'
+import { computeLiveMetrics } from '@/services/analytics-service'
 
 import type {
   AgentEvent,
@@ -93,16 +94,22 @@ export function OverviewClient({
   agentEvents,
   recentPayments,
 }: OverviewClientProps) {
-  const [session, setSession] = useState(() => ({
-    revenueAtRisk: metrics.revenueAtRisk,
-    recoverableRevenue: metrics.recoverableRevenue,
-    revenueRecovered: metrics.revenueRecovered,
-    recoveryRate: metrics.recoveryRate,
-    aiActionsExecuted: secondaryMetrics.aiActionsExecuted,
-    humanEscalations: secondaryMetrics.humanEscalations,
-    safetyBlocks: secondaryMetrics.safetyBlocks,
-    averageRecoveryTimeMinutes: secondaryMetrics.averageRecoveryTimeMinutes,
-  }))
+  const [session, setSession] = useState(() => {
+    // Derive revenue KPIs from the live in-memory store (the same store the
+    // agent simulation mutates) so they reflect actual recoveries instead of
+    // the server-rendered static snapshot. Secondary stats stay seed-based.
+    const live = computeLiveMetrics()
+    return {
+      revenueAtRisk: live.revenueAtRisk,
+      recoverableRevenue: live.recoverableRevenue,
+      revenueRecovered: live.revenueRecovered,
+      recoveryRate: live.recoveryRate,
+      aiActionsExecuted: secondaryMetrics.aiActionsExecuted,
+      humanEscalations: secondaryMetrics.humanEscalations,
+      safetyBlocks: secondaryMetrics.safetyBlocks,
+      averageRecoveryTimeMinutes: secondaryMetrics.averageRecoveryTimeMinutes,
+    }
+  })
   const [funnelState, setFunnelState] = useState<RecoveryFunnelStage[]>(funnel)
   const [pulseKey, setPulseKey] = useState<string | undefined>(undefined)
   const [activeStage, setActiveStage] = useState<PipelineStageKey | null>(null)
@@ -113,7 +120,10 @@ export function OverviewClient({
   function handleDemoComplete(amount: number) {
     setSession((prev) => {
       const revenueRecovered = prev.revenueRecovered + amount
-      const recoveryRate = prev.recoverableRevenue > 0 ? revenueRecovered / prev.recoverableRevenue : prev.recoveryRate
+      // Mirrors the live formula ("recovered ÷ recovered + at risk") used by
+      // computeLiveMetrics so the demo button and the KPIs stay consistent.
+      const totalConsidered = revenueRecovered + prev.revenueAtRisk
+      const recoveryRate = totalConsidered > 0 ? revenueRecovered / totalConsidered : prev.recoveryRate
       return { ...prev, revenueRecovered, recoveryRate, aiActionsExecuted: prev.aiActionsExecuted + 1 }
     })
     setFunnelState((prev) =>

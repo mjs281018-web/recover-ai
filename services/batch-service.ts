@@ -3,7 +3,17 @@
  * synthetic demo dataset for the foundation phase.
  */
 import type { Batch } from '@/types'
-import { demoBatches } from '@/data/demo'
+import { demoBatches, demoPayments, demoStrategies } from '@/data/demo'
+import { DEMO_SIMULATION_PAYMENT_IDS } from '@/lib/recovery-pipeline'
+import { notifyRuntimeChange } from '@/lib/runtime-events'
+import { recordAuditEvent } from '@/services/audit-service'
+
+function sessionTimestamp(): string {
+  return new Date().toLocaleTimeString('en-IN', {
+    hour12: false,
+    timeZone: 'Asia/Kolkata',
+  })
+}
 
 export async function listBatches(): Promise<Batch[]> {
   return [...demoBatches].sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
@@ -162,6 +172,48 @@ export async function simulateBatchRecovery(
       processed: paymentsProcessed,
     },
   ]
+
+  // -------------------------------------------------------------------------
+  // Write-through to the shared in-memory store so the whole app stays
+  // connected: the batch record, matching at-risk payments, the linked
+  // strategy's coverage, the audit trail, and runtime subscribers all observe
+  // this simulation. The Agent Command Center's demo payments are excluded so
+  // its curated scenarios are never altered by a batch run.
+  // -------------------------------------------------------------------------
+  batch.status = 'completed'
+  batch.progress = 1
+  batch.recoveredAmount = Math.max(batch.recoveredAmount, recoveredAmount)
+  batch.completedAt = sessionTimestamp()
+
+  const candidatePayments = demoPayments.filter(
+    (payment) =>
+      (payment.status === 'at-risk' || payment.status === 'in-progress') &&
+      !(DEMO_SIMULATION_PAYMENT_IDS as readonly string[]).includes(payment.id),
+  )
+  const recoverCount = Math.min(recoveredPayments, candidatePayments.length)
+  for (let i = 0; i < recoverCount; i++) {
+    const payment = candidatePayments[i]
+    if (!payment) continue
+    payment.status = 'recovered'
+    payment.attempts += 1
+    payment.updatedAt = sessionTimestamp()
+    notifyRuntimeChange('payment-updated', payment.id)
+  }
+
+  const strategy = demoStrategies.find((s) => s.id === batch.strategyId)
+  if (strategy) {
+    strategy.paymentsCovered += recoverCount
+  }
+
+  await recordAuditEvent({
+    id: `A-batch-${batch.id}-${Date.now()}`,
+    actor: 'system',
+    action: `Batch ${batch.name} completed — ${recoverCount} payments recovered, ${escalatedPayments} escalated, ${stoppedPayments} stopped.`,
+    target: batch.id,
+    timestamp: sessionTimestamp(),
+    status: 'info',
+  })
+  notifyRuntimeChange('batch-simulated', batch.id)
 
   return {
     batchId,

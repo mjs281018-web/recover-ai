@@ -58,6 +58,8 @@ import {
   type RecoveryStageSnapshot,
 } from '@/services/agent-service'
 
+import { computeLiveMetrics } from '@/services/analytics-service'
+
 import { RECOVERY_ACTION_LABELS } from '@/types'
 
 import type {
@@ -402,6 +404,29 @@ export function AgentCommandCenter({
   const [busy, setBusy] = useState(false)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
 
+  // Live metric cards — derived from the in-memory store (the same arrays the
+  // simulation mutates) so a successful recovery moves the numbers instantly,
+  // instead of showing the static funnel-based props.
+  const [liveStats, setLiveStats] = useState(() => {
+    const live = computeLiveMetrics()
+    return {
+      paymentsAnalyzed: live.paymentsAnalyzed,
+      aiActionsExecuted: live.aiActionsExecuted,
+      successfulRecoveries: live.successfulRecoveries,
+      revenueRecovered: live.revenueRecovered,
+    }
+  })
+
+  function refreshLiveStats() {
+    const live = computeLiveMetrics()
+    setLiveStats({
+      paymentsAnalyzed: live.paymentsAnalyzed,
+      aiActionsExecuted: live.aiActionsExecuted,
+      successfulRecoveries: live.successfulRecoveries,
+      revenueRecovered: live.revenueRecovered,
+    })
+  }
+
   const [approvalStatus, setApprovalStatus] =
     useState<ApprovalStatus>(
       approvals.find(
@@ -595,6 +620,8 @@ export function AgentCommandCenter({
       ...prev,
     ])
 
+    refreshLiveStats()
+
     if (snapshot.policyEvaluation?.blocked) {
       playingRef.current = false
       return 'done'
@@ -717,6 +744,7 @@ export function AgentCommandCenter({
     runIdRef.current += 1
 
     await resetRecoveryRun(paymentId)
+    refreshLiveStats()
 
     executedRef.current = 0
     snapshotsRef.current = []
@@ -2195,7 +2223,7 @@ export function AgentCommandCenter({
           </div>
 
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {metrics.paymentsAnalyzed.toLocaleString(
+            {liveStats.paymentsAnalyzed.toLocaleString(
               'en-IN',
             )}
           </div>
@@ -2217,7 +2245,7 @@ export function AgentCommandCenter({
           </div>
 
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {metrics.aiActionsExecuted.toLocaleString(
+            {liveStats.aiActionsExecuted.toLocaleString(
               'en-IN',
             )}
           </div>
@@ -2239,7 +2267,7 @@ export function AgentCommandCenter({
           </div>
 
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {metrics.successfulRecoveries.toLocaleString(
+            {liveStats.successfulRecoveries.toLocaleString(
               'en-IN',
             )}
           </div>
@@ -2262,7 +2290,7 @@ export function AgentCommandCenter({
 
           <div className="mt-3 text-2xl font-semibold tabular-nums text-success">
             {formatCompactCurrency(
-              metrics.revenueRecovered,
+              liveStats.revenueRecovered,
             )}
           </div>
 

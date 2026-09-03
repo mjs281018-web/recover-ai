@@ -25,7 +25,12 @@ import type { PipelineStageKey } from '@/lib/recovery-pipeline'
 import { resetSyntheticSimulation } from '@/lib/providers/payment-provider'
 import { getPayment, retryPayment } from '@/services/payment-service'
 import { getCustomer } from '@/services/customer-service'
-import { listStrategies, listRecoveryOutcomes, recordRecoveryOutcome } from '@/services/recovery-service'
+import {
+  listStrategies,
+  listRecoveryActions,
+  listRecoveryOutcomes,
+  recordRecoveryOutcome,
+} from '@/services/recovery-service'
 import {
   decideApproval,
   getApprovalForPayment,
@@ -142,11 +147,37 @@ async function resolveDecision(payment: Payment): Promise<{
 }> {
   const existing = await listAgentDecisions(payment.id)
   const strategies = await listStrategies()
-  const matched = payment.failureReason
+  let matched = payment.failureReason
     ? strategies.filter(
         (s) => s.status === 'active' && s.triggerFailureReasons.includes(payment.failureReason!),
       )
     : strategies.filter((s) => s.status === 'active').slice(0, 2)
+
+  // Adaptive recovery — if a previous synthetic attempt on this payment failed,
+  // re-prioritize strategies that lead with a different channel and prefer
+  // channel fallback so the next decision actually changes based on history.
+  const priorOutcomes = await listRecoveryOutcomes(payment.id)
+  const priorActions = await listRecoveryActions(payment.id)
+  const failedAction = priorActions.find((a) => a.status === 'failed')
+  const priorFailure: Pick<RecoveryOutcome, 'channel' | 'result'> | undefined =
+    [...priorOutcomes].reverse().find((o) => o.result === 'failed') ??
+    (failedAction ? { channel: failedAction.channel, result: 'failed' as const } : undefined)
+  const hasFallbackChannel =
+    priorFailure !== undefined &&
+    matched.some(
+      (s) => s.channelPriority.length > 0 && s.channelPriority[0] !== priorFailure.channel,
+    )
+  if (priorFailure && hasFallbackChannel) {
+    matched = [...matched].sort(
+      (a, b) =>
+        Number(
+          b.channelPriority[0] !== undefined && b.channelPriority[0] !== priorFailure.channel,
+        ) -
+        Number(
+          a.channelPriority[0] !== undefined && a.channelPriority[0] !== priorFailure.channel,
+        ),
+    )
+  }
 
   if (existing[0]) {
     return { decision: existing[0], matchedStrategies: matched }
@@ -159,24 +190,40 @@ async function resolveDecision(payment: Payment): Promise<{
     alternatives.push('retry')
   }
 
+  const recommendedAction: RecoveryActionType =
+    priorFailure !== undefined &&
+    hasFallbackChannel &&
+    payment.channel !== 'mandate'
+      ? 'switch-channel'
+      : payment.recommendedAction
+
+  const reasoning = [
+    payment.failureReason
+      ? `Root cause is ${FAILURE_REASON_LABELS[payment.failureReason]}.`
+      : 'No failure reason present on this payment.',
+    top
+      ? `Matched strategy ${top.name} (${Math.round(top.successRate * 100)}% historical success).`
+      : 'No specialised strategy matched; using the payment’s recommended action.',
+    `Model confidence is ${Math.round(payment.aiConfidence * 100)}% at ${payment.risk} risk.`,
+  ]
+  if (priorFailure) {
+    reasoning.push(
+      hasFallbackChannel && top
+        ? `Previous attempt via ${priorFailure.channel.toUpperCase()} failed — re-analyzing and preferring ${top.channelPriority[0]?.toUpperCase()} for the next attempt.`
+        : `Previous attempt via ${priorFailure.channel.toUpperCase()} failed — policy and retry limits now decide if another attempt is permitted.`,
+    )
+  }
+
   const decision: AgentDecision = {
     id: `AD-session-${payment.id}`,
     paymentId: payment.id,
-    summary: RECOVERY_ACTION_LABELS[payment.recommendedAction],
-    reasoning: [
-      payment.failureReason
-        ? `Root cause is ${FAILURE_REASON_LABELS[payment.failureReason]}.`
-        : 'No failure reason present on this payment.',
-      top
-        ? `Matched strategy ${top.name} (${Math.round(top.successRate * 100)}% historical success).`
-        : 'No specialised strategy matched; using the payment’s recommended action.',
-      `Model confidence is ${Math.round(payment.aiConfidence * 100)}% at ${payment.risk} risk.`,
-    ],
+    summary: RECOVERY_ACTION_LABELS[recommendedAction],
+    reasoning,
     confidence: payment.aiConfidence,
-    recommendedAction: payment.recommendedAction,
+    recommendedAction,
     alternativeActions: alternatives,
-    requiresApproval: payment.recommendedAction === 'human-approval',
-    policyId: payment.recommendedAction === 'human-approval' ? 'PL-02' : 'PL-01',
+    requiresApproval: recommendedAction === 'human-approval',
+    policyId: recommendedAction === 'human-approval' ? 'PL-02' : 'PL-01',
     createdAt: payment.updatedAt,
   }
 

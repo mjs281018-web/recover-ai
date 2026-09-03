@@ -21,7 +21,7 @@ type RuntimeEventType =
   | 'batch-simulated'
   | 'reset'
 
-interface RuntimeEvent {
+export interface RuntimeEvent {
   type: RuntimeEventType
   paymentId?: string
   timestamp: number

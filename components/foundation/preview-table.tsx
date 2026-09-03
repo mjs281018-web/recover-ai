@@ -31,11 +31,24 @@ export function PreviewTable({
 export function PreviewRow({
   children,
   className,
+  onClick,
 }: {
   children: React.ReactNode
   className?: string
+  onClick?: () => void
 }) {
-  return <tr className={cn('transition-colors hover:bg-accent/40', className)}>{children}</tr>
+  return (
+    <tr
+      onClick={onClick}
+      className={cn(
+        'transition-colors hover:bg-accent/40',
+        onClick && 'cursor-pointer',
+        className,
+      )}
+    >
+      {children}
+    </tr>
+  )
 }
 
 export function PreviewCell({

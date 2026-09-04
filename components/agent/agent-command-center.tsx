@@ -38,6 +38,8 @@ import {
   CardDescription,
 } from '@/components/ui/card'
 
+import { RazorpayIntegrationPanel } from '@/components/agent/razorpay-integration-panel'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -735,6 +737,7 @@ export function AgentCommandCenter({
   return (
     <div className="flex flex-col gap-6">
       {/* AGENT STATUS HERO CARD */}
+      <RazorpayIntegrationPanel />
       <Card className="relative overflow-hidden border-ai/20">
         <div className="pointer-events-none absolute -top-20 -right-20 size-64 rounded-full bg-ai-muted/30 blur-3xl" />
 

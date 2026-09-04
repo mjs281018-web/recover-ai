@@ -4,21 +4,28 @@
  * implementation would aggregate from the payments/recovery datastore.
  */
 import type {
+  AgentEvent,
+  AgentEventKind,
   ChannelPerformance,
   CustomerSegment,
   ExpectedVsActualPoint,
   FailureReason,
   FailureReasonBreakdown,
+  Payment,
   PaymentStatus,
+  Prediction,
   ProbabilityBucket,
+  RecoveryAction,
+  RecoveryActionType,
   RecoveryActionStatus,
   RecoveryChannel,
   RecoveryInsight,
+  RecoveryOutcome,
   RecoveryStrategy,
   RevenueTrendPoint,
   SegmentRisk,
 } from '@/types'
-import { FAILURE_REASON_LABELS } from '@/types'
+import { FAILURE_REASON_LABELS, RECOVERY_ACTION_LABELS } from '@/types'
 import { formatCompactCurrency, formatCurrency, formatPercent } from '@/lib/format'
 import {
   demoMetrics,
@@ -40,6 +47,8 @@ import {
   demoEarlyWarnings,
   demoRootCauses,
   demoRecoveryFunnel,
+  demoAgentEvents,
+  demoPredictions,
 } from '@/data/demo'
 
 // ---------------------------------------------------------------------------
@@ -515,5 +524,315 @@ export async function getAnalyticsDashboard(): Promise<LiveAnalyticsDashboard> {
     segmentRisk: computeLiveSegmentRisk(),
     probabilityDistribution: computeLiveProbabilityDistribution(),
     expectedVsActual: computeLiveExpectedVsActual(),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Live outcome learning
+// ---------------------------------------------------------------------------
+// Derives strategy/channel/failure-reason performance and adaptive learning
+// signals from the actual in-memory recovery outcomes + actions. Truthful:
+// measured rates come only from recorded outcomes; catalog defaults are used
+// only when no evidence exists and are clearly flagged as unmeasured.
+
+export interface LiveStrategyLearning {
+  strategyId: string
+  name: string
+  status: 'active' | 'draft' | 'paused'
+  attempts: number
+  successes: number
+  failures: number
+  successRate: number
+  recoveredRevenue: number
+  averageRecoveryValue: number
+  preferredChannel: string | null
+  /** true if successRate is computed from measured outcomes, false if catalog default */
+  measured: boolean
+}
+
+export interface LiveChannelLearning {
+  channel: RecoveryChannel
+  label: string
+  attempts: number
+  successes: number
+  failures: number
+  successRate: number
+  recoveredRevenue: number
+}
+
+export interface LiveFailureReasonLearning {
+  reason: FailureReason | 'other'
+  label: string
+  attempts: number
+  successes: number
+  failures: number
+  successRate: number
+  recoveredRevenue: number
+}
+
+export interface LiveRecentOutcome {
+  id: string
+  paymentId: string
+  action: RecoveryActionType
+  result: 'recovered' | 'failed' | 'pending'
+  amountRecovered: number | null
+  channel: RecoveryChannel
+  recoveredAt: string | null
+  customerName: string
+  paymentAmount: number
+}
+
+export type LearningSignalImpact = 'positive' | 'negative' | 'neutral'
+
+export interface LearningSignal {
+  id: string
+  message: string
+  impact: LearningSignalImpact
+  timestamp: string
+}
+
+export interface OutcomeLearningDashboard {
+  summary: {
+    totalAttempts: number
+    successes: number
+    failures: number
+    pending: number
+    overallSuccessRate: number
+    totalRecoveredRevenue: number
+    averageRecoveryValue: number
+  }
+  strategyLearning: LiveStrategyLearning[]
+  channelLearning: LiveChannelLearning[]
+  failureReasonLearning: LiveFailureReasonLearning[]
+  recentOutcomes: LiveRecentOutcome[]
+  signals: LearningSignal[]
+  predictions: Prediction[]
+  modelUpdates: AgentEvent[]
+}
+
+/** Payments whose failure reason matches a strategy's trigger reasons. */
+function paymentsForStrategy(strategy: RecoveryStrategy): Payment[] {
+  return demoPayments.filter(
+    (p) => p.failureReason && strategy.triggerFailureReasons.includes(p.failureReason),
+  )
+}
+
+/** Outcomes for a given set of payment IDs. */
+function outcomesForPayments(paymentIds: Set<string>): RecoveryOutcome[] {
+  return demoRecoveryOutcomes.filter((o) => paymentIds.has(o.paymentId))
+}
+
+export function computeLiveStrategyLearning(): LiveStrategyLearning[] {
+  return demoStrategies.map((strategy) => {
+    const matchedPayments = paymentsForStrategy(strategy)
+    const matchedIds = new Set(matchedPayments.map((p) => p.id))
+    const outcomes = outcomesForPayments(matchedIds)
+
+    const attempts = outcomes.length
+    const successes = outcomes.filter((o) => o.result === 'recovered').length
+    const failures = outcomes.filter((o) => o.result === 'failed').length
+    const recoveredRevenue = outcomes
+      .filter((o) => o.result === 'recovered')
+      .reduce((sum, o) => sum + (o.amountRecovered ?? 0), 0)
+
+    // Preferred channel = most frequent channel among successful outcomes.
+    const channelCounts = new Map<RecoveryChannel, number>()
+    for (const o of outcomes) {
+      if (o.result === 'recovered') {
+        channelCounts.set(o.channel, (channelCounts.get(o.channel) ?? 0) + 1)
+      }
+    }
+    let preferredChannel: string | null = null
+    let maxCount = 0
+    for (const [channel, count] of channelCounts) {
+      if (count > maxCount) {
+        maxCount = count
+        preferredChannel = CHANNEL_LABELS[channel] ?? channel
+      }
+    }
+
+    // Measured only when we have at least one recorded outcome.
+    const measured = attempts > 0
+    const successRate = measured ? successes / attempts : strategy.successRate
+    const averageRecoveryValue = successes > 0 ? recoveredRevenue / successes : 0
+
+    return {
+      strategyId: strategy.id,
+      name: strategy.name,
+      status: strategy.status,
+      attempts,
+      successes,
+      failures,
+      successRate,
+      recoveredRevenue,
+      averageRecoveryValue,
+      preferredChannel,
+      measured,
+    }
+  })
+}
+
+export function computeLiveChannelLearning(): LiveChannelLearning[] {
+  const channels: RecoveryChannel[] = ['upi', 'card', 'netbanking', 'wallet', 'mandate']
+  return channels.map((channel) => {
+    const outcomes = demoRecoveryOutcomes.filter((o) => o.channel === channel)
+    const attempts = outcomes.length
+    const successes = outcomes.filter((o) => o.result === 'recovered').length
+    const failures = outcomes.filter((o) => o.result === 'failed').length
+    const recoveredRevenue = outcomes
+      .filter((o) => o.result === 'recovered')
+      .reduce((sum, o) => sum + (o.amountRecovered ?? 0), 0)
+    const successRate = attempts > 0 ? successes / attempts : 0
+
+    return {
+      channel,
+      label: CHANNEL_LABELS[channel],
+      attempts,
+      successes,
+      failures,
+      successRate,
+      recoveredRevenue,
+    }
+  })
+}
+
+export function computeLiveFailureReasonLearning(): LiveFailureReasonLearning[] {
+  const reasonMap = new Map<FailureReason | 'other', RecoveryOutcome[]>()
+  for (const outcome of demoRecoveryOutcomes) {
+    const payment = demoPayments.find((p) => p.id === outcome.paymentId)
+    const reason = payment?.failureReason ?? 'other'
+    const list = reasonMap.get(reason) ?? []
+    list.push(outcome)
+    reasonMap.set(reason, list)
+  }
+
+  const result: LiveFailureReasonLearning[] = []
+  for (const [reason, outcomes] of reasonMap) {
+    const attempts = outcomes.length
+    const successes = outcomes.filter((o) => o.result === 'recovered').length
+    const failures = outcomes.filter((o) => o.result === 'failed').length
+    const recoveredRevenue = outcomes
+      .filter((o) => o.result === 'recovered')
+      .reduce((sum, o) => sum + (o.amountRecovered ?? 0), 0)
+    const successRate = attempts > 0 ? successes / attempts : 0
+
+    result.push({
+      reason,
+      label: FAILURE_REASON_LABELS[reason as FailureReason] ?? reason,
+      attempts,
+      successes,
+      failures,
+      successRate,
+      recoveredRevenue,
+    })
+  }
+
+  return result.sort((a, b) => b.attempts - a.attempts)
+}
+
+export function computeLiveRecentOutcomes(): LiveRecentOutcome[] {
+  return [...demoRecoveryOutcomes]
+    .sort((a, b) => {
+      const aTime = a.recoveredAt ?? ''
+      const bTime = b.recoveredAt ?? ''
+      return aTime < bTime ? 1 : -1
+    })
+    .slice(0, 8)
+    .map((outcome) => {
+      const payment = demoPayments.find((p) => p.id === outcome.paymentId)
+      return {
+        id: outcome.id,
+        paymentId: outcome.paymentId,
+        action: outcome.action,
+        result: outcome.result,
+        amountRecovered: outcome.amountRecovered ?? null,
+        channel: outcome.channel,
+        recoveredAt: outcome.recoveredAt ?? null,
+        customerName: payment?.customerName ?? 'Unknown',
+        paymentAmount: payment?.amount ?? 0,
+      }
+    })
+}
+
+export function computeLiveLearningSignals(): LearningSignal[] {
+  const signals: LearningSignal[] = []
+  const strategyLearning = computeLiveStrategyLearning()
+  const channelLearning = computeLiveChannelLearning()
+
+  // Find the best-performing measured strategy.
+  const measuredStrategies = strategyLearning.filter((s) => s.measured && s.attempts >= 1)
+  if (measuredStrategies.length > 0) {
+    const best = measuredStrategies.reduce((a, b) => (a.successRate >= b.successRate ? a : b))
+    signals.push({
+      id: 'ls-01',
+      message: `"${best.name}" has the highest measured success rate at ${formatPercent(best.successRate)} across ${best.attempts} outcome${best.attempts === 1 ? '' : 's'}.`,
+      impact: best.successRate >= 0.6 ? 'positive' : 'negative',
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  // Channel signals.
+  const measuredChannels = channelLearning.filter((c) => c.attempts >= 1)
+  if (measuredChannels.length > 0) {
+    const best = measuredChannels.reduce((a, b) => (a.successRate >= b.successRate ? a : b))
+    signals.push({
+      id: 'ls-02',
+      message: `${best.label} leads recovery performance at ${formatPercent(best.successRate)} across ${best.attempts} outcome${best.attempts === 1 ? '' : 's'}.`,
+      impact: best.successRate >= 0.6 ? 'positive' : 'negative',
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  // Overall outcome summary.
+  const totalOutcomes = demoRecoveryOutcomes.length
+  const totalRecovered = demoRecoveryOutcomes.filter((o) => o.result === 'recovered').length
+  if (totalOutcomes > 0) {
+    const rate = totalRecovered / totalOutcomes
+    signals.push({
+      id: 'ls-03',
+      message: `${totalRecovered} of ${totalOutcomes} recorded outcomes recovered (${formatPercent(rate)}).`,
+      impact: rate >= 0.5 ? 'positive' : 'negative',
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  return signals
+}
+
+/** One-shot payload for the /learning dashboard; re-fetched on every runtime event. */
+export async function getOutcomeLearningDashboard(): Promise<OutcomeLearningDashboard> {
+  const outcomes = demoRecoveryOutcomes
+  const successes = outcomes.filter((o) => o.result === 'recovered').length
+  const failures = outcomes.filter((o) => o.result === 'failed').length
+  const pending = outcomes.filter((o) => o.result === 'pending').length
+  const totalAttempts = outcomes.length
+  const totalRecoveredRevenue = outcomes
+    .filter((o) => o.result === 'recovered')
+    .reduce((sum, o) => sum + (o.amountRecovered ?? 0), 0)
+
+  const predictions = [...demoPredictions].sort((a, b) =>
+    a.generatedAt < b.generatedAt ? 1 : -1,
+  )
+  const modelUpdates = demoAgentEvents
+    .filter((e) => e.kind === 'learning')
+    .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+
+  return {
+    summary: {
+      totalAttempts,
+      successes,
+      failures,
+      pending,
+      overallSuccessRate: totalAttempts > 0 ? successes / totalAttempts : 0,
+      totalRecoveredRevenue,
+      averageRecoveryValue: successes > 0 ? totalRecoveredRevenue / successes : 0,
+    },
+    strategyLearning: computeLiveStrategyLearning(),
+    channelLearning: computeLiveChannelLearning(),
+    failureReasonLearning: computeLiveFailureReasonLearning(),
+    recentOutcomes: computeLiveRecentOutcomes(),
+    signals: computeLiveLearningSignals(),
+    predictions,
+    modelUpdates,
   }
 }

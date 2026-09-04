@@ -5,10 +5,10 @@ import {
   AlertTriangle,
   Banknote,
   Bot,
-  Lightbulb,
   CheckCircle2,
-  OctagonAlert as AlertOctagon,
   Gauge,
+  Lightbulb,
+  OctagonAlert as AlertOctagon,
   ShieldAlert,
   Target,
   Timer,
@@ -95,220 +95,200 @@ export function AnalyticsDashboard({ initial }: { initial: LiveAnalyticsDashboar
         <KpiCard label="Human Escalations" value={overview.humanEscalations} formatValue={count} icon={Users} accent="warning" hint={`${overview.pendingApprovals} pending`} />
         <KpiCard label="Safety Blocks" value={overview.safetyBlocks} formatValue={count} icon={ShieldAlert} accent="danger" hint="policy-blocked" />
       </div>
-      {/* Preserved sections — insights + channel rates, now computed live. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recovery insights</CardTitle>
-            <CardDescription>Signals computed from the current store, ahead of the seeded analysis.</CardDescription>
+            <CardDescription>Live signals computed ahead of the seeded narratives.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {dashboard.insights.length === 0 ? (
-              <EmptyState
-                title="No insights yet"
-                description="Insights appear as recovery state changes."
-              />
+              <EmptyState title="No insights yet" description="Run a recovery to generate live signals." />
             ) : (
-              dashboard.insights.map((insight) => {
-                const Icon = CATEGORY_ICON[insight.category]
-                return (
-                  <div key={insight.id} className="flex items-start gap-3 rounded-lg border border-border bg-surface/40 p-3.5">
-                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                      <Icon className="size-3.5" />
-                    </span>
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <p className="text-sm font-medium text-foreground">{insight.title}</p>
-                      <p className="text-xs leading-relaxed text-muted-foreground">{insight.description}</p>
-                    </div>
-                    <Badge variant={IMPACT_VARIANT[insight.impact]} className="shrink-0 capitalize">
-                      {insight.impact}
-                    </Badge>
-                  </div>
-                )
-              })
+              <ul className="space-y-3">
+                {dashboard.insights.map((insight) => {
+                  const Icon = CATEGORY_ICON[insight.category] ?? Lightbulb
+                  return (
+                    <li key={insight.id} className="flex gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                      <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">{insight.title}</span>
+                          <Badge variant={IMPACT_VARIANT[insight.impact]}>{insight.impact}</Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{insight.description}</p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Recovery rate by channel</CardTitle>
-            <CardDescription>Share of demo payments recovered per channel, computed live.</CardDescription>
+            <CardTitle>Recovery by channel</CardTitle>
+            <CardDescription>Live recovery rate per payment channel.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-0">
+          <CardContent>
             {dashboard.byChannel.length === 0 ? (
-              <EmptyState
-                title="No channel data yet"
-                description="Recover a payment to populate channel analytics."
-              />
+              <EmptyState title="No channel data" description="No payments recorded yet." />
             ) : (
-              dashboard.byChannel.map((row) => (
-                <div key={row.channel} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="capitalize text-foreground">{row.label}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {row.recovered}/{row.total} · {formatPercent(row.recoveryRate)}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width] duration-500"
-                      style={{ width: `${row.recoveryRate * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))
+              <>
+                <BarChart
+                  labels={dashboard.byChannel.map((c) => c.label)}
+                  series={[
+                    {
+                      key: 'recoveryRate',
+                      label: 'Recovery rate',
+                      color: COLORS.success,
+                      values: dashboard.byChannel.map((c) => c.recoveryRate),
+                    },
+                  ]}
+                  orientation="horizontal"
+                  valueFormatter={(v) => formatPercent(v, 0)}
+                />
+                <ul className="mt-4 space-y-1 text-sm">
+                  {dashboard.byChannel.map((c) => (
+                    <li key={c.channel} className="flex justify-between text-muted-foreground">
+                      <span>{c.label}</span>
+                      <span>
+                        {c.recovered}/{c.total} · {formatCompactCurrency(c.revenueRecovered)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <ChartFrame
           title="Recovery by failure reason"
-          description="Revenue impact of each failure reason across current payments."
+          description="Revenue impact per failure reason across the open payment queue."
+          isEmpty={dashboard.failureBreakdown.length === 0}
+          empty={<EmptyState title="No failure data" description="No payments recorded yet." />}
         >
-          {dashboard.failureBreakdown.length === 0 ? (
-            <EmptyState
-              title="No failure data yet"
-              description="Failed payments will break down by reason here."
-            />
-          ) : (
-            <BarChart
-              orientation="horizontal"
-              labels={dashboard.failureBreakdown.map((row) => row.label)}
-              series={[
-                {
-                  key: 'revenue-impact',
-                  label: 'Revenue impact',
-                  color: COLORS.warning,
-                  values: dashboard.failureBreakdown.map((row) => row.revenueImpact),
-                },
-              ]}
-              valueFormatter={formatCompactCurrency}
-            />
-          )}
+          <BarChart
+            labels={dashboard.failureBreakdown.map((f) => f.label)}
+            series={[
+              {
+                key: 'revenueImpact',
+                label: 'Revenue at risk',
+                color: COLORS.warning,
+                values: dashboard.failureBreakdown.map((f) => f.revenueImpact),
+              },
+            ]}
+            orientation="horizontal"
+            valueFormatter={formatCompactCurrency}
+          />
         </ChartFrame>
 
         <ChartFrame
           title="Strategy performance"
-          description="Attempts and recoveries per strategy from recorded outcomes."
-          legend={
-            <ChartLegend
-              items={[
-                { label: 'Attempts', color: COLORS.ai },
-                { label: 'Recovered', color: COLORS.success },
-              ]}
-            />
-          }
+          description="Attempts vs recovered per strategy. Unmeasured strategies show catalog coverage."
+          isEmpty={dashboard.strategyPerformance.length === 0}
+          empty={<EmptyState title="No strategy data" description="No strategies recorded yet." />}
         >
           <BarChart
-            orientation="horizontal"
-            labels={dashboard.strategyPerformance.map((strategy) => strategy.name)}
+            labels={dashboard.strategyPerformance.map((s) => s.name)}
             series={[
               {
                 key: 'attempts',
                 label: 'Attempts',
-                color: COLORS.ai,
-                values: dashboard.strategyPerformance.map((strategy) => strategy.attempts),
+                color: COLORS.primary,
+                values: dashboard.strategyPerformance.map((s) => s.attempts),
               },
               {
                 key: 'recovered',
                 label: 'Recovered',
                 color: COLORS.success,
-                values: dashboard.strategyPerformance.map((strategy) => strategy.recovered),
+                values: dashboard.strategyPerformance.map((s) => s.recovered),
               },
             ]}
-            valueFormatter={count}
+            valueFormatter={(v) => String(Math.round(v))}
           />
+          <ChartLegend items={[
+            { label: 'Attempts', color: COLORS.primary },
+            { label: 'Recovered', color: COLORS.success },
+          ]} />
         </ChartFrame>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+      <div className="grid gap-4 lg:grid-cols-3">
         <ChartFrame
           title="Customer segment risk"
-          description="Open revenue at risk by customer segment."
+          description="Revenue at risk per customer segment."
+          isEmpty={dashboard.segmentRisk.length === 0}
+          empty={<EmptyState title="No segment data" description="No payments recorded yet." />}
         >
-          {dashboard.segmentRisk.length === 0 ? (
-            <EmptyState
-              title="No open at-risk revenue"
-              description="Segment risk appears while payments await recovery."
-            />
-          ) : (
-            <BarChart
-              orientation="vertical"
-              labels={dashboard.segmentRisk.map((row) => row.label)}
-              series={[
-                {
-                  key: 'revenue-at-risk',
-                  label: 'Revenue at risk',
-                  color: COLORS.warning,
-                  values: dashboard.segmentRisk.map((row) => row.revenueAtRisk),
-                },
-              ]}
-              valueFormatter={formatCompactCurrency}
-            />
-          )}
+          <BarChart
+            labels={dashboard.segmentRisk.map((s) => s.segment)}
+            series={[
+              {
+                key: 'revenueAtRisk',
+                label: 'Revenue at risk',
+                color: COLORS.warning,
+                values: dashboard.segmentRisk.map((s) => s.revenueAtRisk),
+              },
+            ]}
+            valueFormatter={formatCompactCurrency}
+          />
         </ChartFrame>
 
         <ChartFrame
           title="Probability distribution"
-          description="Recovery-probability estimates across current payments."
+          description="Open payments bucketed by recovery probability."
+          isEmpty={dashboard.probabilityDistribution.length === 0}
+          empty={<EmptyState title="No probability data" description="No payments recorded yet." />}
         >
-          {dashboard.probabilityDistribution.length === 0 ? (
-            <EmptyState
-              title="No payments yet"
-              description="The histogram appears once payments exist."
-            />
-          ) : (
-            <BarChart
-              orientation="vertical"
-              labels={dashboard.probabilityDistribution.map((bucket) => bucket.bucketLabel)}
-              series={[
-                {
-                  key: 'payments',
-                  label: 'Payments',
-                  color: COLORS.primary,
-                  values: dashboard.probabilityDistribution.map((bucket) => bucket.paymentCount),
-                },
-              ]}
-              valueFormatter={count}
-            />
-          )}
+          <BarChart
+            labels={dashboard.probabilityDistribution.map((p) => p.bucketLabel)}
+            series={[
+              {
+                key: 'count',
+                label: 'Payments',
+                color: COLORS.primary,
+                values: dashboard.probabilityDistribution.map((p) => p.paymentCount),
+              },
+            ]}
+            valueFormatter={(v) => String(Math.round(v))}
+          />
+        </ChartFrame>
+
+        <ChartFrame
+          title="Expected vs actual"
+          description="Seeded weekly history plus the live 'Now' point."
+          isEmpty={dashboard.expectedVsActual.length === 0}
+          empty={<EmptyState title="No outcome data" description="No outcomes recorded yet." />}
+        >
+          <BarChart
+            labels={dashboard.expectedVsActual.map((p) => p.label)}
+            series={[
+              {
+                key: 'expected',
+                label: 'Expected',
+                color: COLORS.primary,
+                values: dashboard.expectedVsActual.map((p) => p.expected),
+              },
+              {
+                key: 'actual',
+                label: 'Actual',
+                color: COLORS.success,
+                values: dashboard.expectedVsActual.map((p) => p.actual),
+              },
+            ]}
+            valueFormatter={formatCompactCurrency}
+          />
+          <ChartLegend items={[
+            { label: 'Expected', color: COLORS.primary },
+            { label: 'Actual', color: COLORS.success },
+          ]} />
         </ChartFrame>
       </div>
-
-      <ChartFrame
-        title="Expected vs actual recovery"
-        description="Seeded six-week history plus a live 'Now' point computed from current outcomes."
-        legend={
-          <ChartLegend
-            items={[
-              { label: 'Expected', color: COLORS.primary },
-              { label: 'Actual', color: COLORS.success },
-            ]}
-          />
-        }
-      >
-        <BarChart
-          orientation="vertical"
-          labels={dashboard.expectedVsActual.map((point) => point.label)}
-          series={[
-            {
-              key: 'expected',
-              label: 'Expected',
-              color: COLORS.primary,
-              values: dashboard.expectedVsActual.map((point) => point.expected),
-            },
-            {
-              key: 'actual',
-              label: 'Actual',
-              color: COLORS.success,
-              values: dashboard.expectedVsActual.map((point) => point.actual),
-            },
-          ]}
-          valueFormatter={formatCompactCurrency}
-        />
-      </ChartFrame>
     </div>
   )
 }

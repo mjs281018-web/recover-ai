@@ -32,6 +32,8 @@ export function ChartFrame({
   actions,
   legend,
   className,
+  isEmpty,
+  empty,
   children,
 }: {
   title: string
@@ -39,6 +41,8 @@ export function ChartFrame({
   actions?: React.ReactNode
   legend?: React.ReactNode
   className?: string
+  isEmpty?: boolean
+  empty?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -52,7 +56,7 @@ export function ChartFrame({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 pt-0">
         {legend}
-        {children}
+        {isEmpty && empty ? empty : children}
       </CardContent>
     </Card>
   )

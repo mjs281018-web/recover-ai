@@ -12,7 +12,7 @@ export function ChartLegend({
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-1.5">
           <span
-            className={cn('inline-block h-[2px] w-3.5 rounded-full', item.dashed && 'opacity-70')}
+            className={cn('inline-block h-0.5 w-3.5 rounded-full', item.dashed && 'opacity-70')}
             style={{
               backgroundColor: item.dashed ? 'transparent' : item.color,
               borderTop: item.dashed ? `2px dashed ${item.color}` : undefined,

@@ -40,6 +40,7 @@ import {
 import { evaluatePolicy } from '@/services/policy-service'
 import { recordAuditEvent, resetSessionAuditEvents } from '@/services/audit-service'
 import { notifyRuntimeChange } from '@/lib/runtime-events'
+import { getAIRecommendation } from '@/services/ai-recommendation-service'
 
 const sessionAgentEventIds = new Set<string>()
 
@@ -190,12 +191,16 @@ async function resolveDecision(payment: Payment): Promise<{
     alternatives.push('retry')
   }
 
+  // Consult the AI decision layer (LLM if configured, deterministic fallback otherwise).
+  // Policy Engine remains authoritative — AI output informs but never overrides policy.
+  const aiRec = await getAIRecommendation(payment)
+
   const recommendedAction: RecoveryActionType =
     priorFailure !== undefined &&
     hasFallbackChannel &&
     payment.channel !== 'mandate'
       ? 'switch-channel'
-      : payment.recommendedAction
+      : aiRec.recommendedAction
 
   const reasoning = [
     payment.failureReason
@@ -204,7 +209,7 @@ async function resolveDecision(payment: Payment): Promise<{
     top
       ? `Matched strategy ${top.name} (${Math.round(top.successRate * 100)}% historical success).`
       : 'No specialised strategy matched; using the payment’s recommended action.',
-    `Model confidence is ${Math.round(payment.aiConfidence * 100)}% at ${payment.risk} risk.`,
+    `Model confidence is ${Math.round(aiRec.confidence * 100)}% at ${aiRec.riskLevel} risk.`,
   ]
   if (priorFailure) {
     reasoning.push(
@@ -219,12 +224,21 @@ async function resolveDecision(payment: Payment): Promise<{
     paymentId: payment.id,
     summary: RECOVERY_ACTION_LABELS[recommendedAction],
     reasoning,
-    confidence: payment.aiConfidence,
+    confidence: aiRec.confidence,
     recommendedAction,
-    alternativeActions: alternatives,
-    requiresApproval: recommendedAction === 'human-approval',
+    alternativeActions: aiRec.alternativeActions.length > 0 ? aiRec.alternativeActions : alternatives,
+    requiresApproval: recommendedAction === 'human-approval' || aiRec.escalationRecommended,
     policyId: recommendedAction === 'human-approval' ? 'PL-02' : 'PL-01',
     createdAt: payment.updatedAt,
+    aiRecommendation: {
+      source: aiRec.status.source,
+      provider: aiRec.status.provider,
+      model: aiRec.status.model,
+      recommendedAction: aiRec.recommendedAction,
+      recommendedChannel: aiRec.recommendedChannel,
+      reasoning: aiRec.reasoning,
+      fallbackReason: aiRec.status.fallbackReason,
+    },
   }
 
   return { decision, matchedStrategies: matched }

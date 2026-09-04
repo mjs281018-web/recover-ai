@@ -198,6 +198,23 @@ export interface AgentDecision {
   requiresApproval: boolean
   policyId?: string
   createdAt: string
+  /** AI recommendation metadata — present when AI decision layer was consulted. */
+  aiRecommendation?: {
+    /** Whether the LLM was used or deterministic fallback was applied. */
+    source: 'ai-llm' | 'deterministic-fallback'
+    /** Provider identifier (e.g., 'openai', 'anthropic', 'deterministic'). */
+    provider: string
+    /** Model identifier if LLM was used. */
+    model: string
+    /** AI's recommended action (may differ from final action after policy enforcement). */
+    recommendedAction: RecoveryActionType
+    /** AI's recommended channel. */
+    recommendedChannel: string
+    /** AI-generated reasoning. */
+    reasoning: string
+    /** Error/fallback reason if AI was unavailable. */
+    fallbackReason?: string
+  }
 }
 
 export type AgentEventKind = 'analysis' | 'decision' | 'action' | 'escalation' | 'learning'

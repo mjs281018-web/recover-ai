@@ -19,6 +19,8 @@ type RuntimeEventType =
   | 'agent-event'
   | 'audit-event'
   | 'batch-simulated'
+  | 'ai-recommendation'
+  | 'settings-change'
   | 'reset'
 
 export interface RuntimeEvent {

@@ -177,11 +177,11 @@ function OrbitVisual() {
       <div className="absolute size-14 rounded-full border border-ai/30" />
       <div className="absolute size-8 rounded-full border border-ai/40" />
 
-      <div className="absolute size-20 animate-spin [animation-duration:8s]">
+      <div className="absolute size-20 animate-[spin_8s_linear_infinite]">
         <div className="absolute top-0 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ai" />
       </div>
 
-      <div className="absolute size-14 animate-spin [animation-duration:6s] [animation-direction:reverse]">
+      <div className="absolute size-14 animate-[spin_6s_linear_infinite_reverse]">
         <div className="absolute top-0 left-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
       </div>
 
@@ -1484,7 +1484,7 @@ export function AgentCommandCenter({
                     </button>
 
                     {isOpen && (
-                      <div className="ml-[42px] flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-[11px] text-muted-foreground">
+                      <div className="ml-10.5 flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-[11px] text-muted-foreground">
                         {event.paymentId && (
                           <span>
                             Payment{' '}
@@ -1557,6 +1557,17 @@ export function AgentCommandCenter({
                     ]
                   }
                 </Badge>
+
+                {featuredDecision.aiRecommendation && (
+                  <Badge
+                    variant={featuredDecision.aiRecommendation.source === 'ai-llm' ? 'ai' : 'neutral'}
+                    className="shrink-0"
+                  >
+                    {featuredDecision.aiRecommendation.source === 'ai-llm'
+                      ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
+                      : `Fallback${featuredDecision.aiRecommendation.fallbackReason ? ` — ${featuredDecision.aiRecommendation.fallbackReason}` : ''}`}
+                  </Badge>
+                )}
               </div>
 
               {/* DECISION METRICS */}

@@ -205,6 +205,7 @@ export async function getRecoveryRateByChannel() {
     rate: total === 0 ? 0 : recovered / total,
   }))
 }
+
 // ---------------------------------------------------------------------------
 // LIVE ANALYTICS (Phase 3A.1)
 // ---------------------------------------------------------------------------
@@ -348,6 +349,7 @@ export function computeLiveFailureBreakdown(): FailureReasonBreakdown[] {
     })
     .sort((a, b) => b.share - a.share)
 }
+
 /** Live per-strategy outcome performance, measured from recorded recovery outcomes. */
 export function computeLiveStrategyPerformance(): LiveStrategyPerformance[] {
   return demoStrategies.map((strategy) => {
@@ -408,6 +410,7 @@ export function computeLiveProbabilityDistribution(): ProbabilityBucket[] {
     paymentCount,
   }))
 }
+
 /**
  * Expected vs actual recovered revenue. The six seeded historical weeks are
  * preserved for context; a live "Now" point is appended from the current
@@ -759,16 +762,28 @@ export function computeLiveLearningSignals(): LearningSignal[] {
   const strategyLearning = computeLiveStrategyLearning()
   const channelLearning = computeLiveChannelLearning()
 
-  // Find the best-performing measured strategy.
-  const measuredStrategies = strategyLearning.filter((s) => s.measured && s.attempts >= 1)
+  // Find the strategy with the actual highest measured success rate.
+  const measuredStrategies = strategyLearning.filter((s) => s.measured && s.attempts > 0)
   if (measuredStrategies.length > 0) {
-    const best = measuredStrategies.reduce((a, b) => (a.successRate >= b.successRate ? a : b))
-    signals.push({
-      id: 'ls-01',
-      message: `"${best.name}" has the highest measured success rate at ${formatPercent(best.successRate)} across ${best.attempts} outcome${best.attempts === 1 ? '' : 's'}.`,
-      impact: best.successRate >= 0.6 ? 'positive' : 'negative',
-      timestamp: new Date().toISOString(),
-    })
+    const maxSuccessRate = Math.max(...measuredStrategies.map((s) => s.successRate))
+
+    // Only claim "highest measured success rate" if at least one recovery succeeded (rate > 0)
+    if (maxSuccessRate > 0) {
+      const topCandidates = measuredStrategies.filter((s) => s.successRate === maxSuccessRate)
+      const best = topCandidates.reduce((a, b) => {
+        if (a.attempts !== b.attempts) {
+          return a.attempts > b.attempts ? a : b
+        }
+        return a.recoveredRevenue >= b.recoveredRevenue ? a : b
+      })
+
+      signals.push({
+        id: 'ls-01',
+        message: `"${best.name}" has the highest measured success rate at ${formatPercent(best.successRate)} across ${best.attempts} outcome${best.attempts === 1 ? '' : 's'}.`,
+        impact: best.successRate >= 0.6 ? 'positive' : 'negative',
+        timestamp: new Date().toISOString(),
+      })
+    }
   }
 
   // Channel signals.

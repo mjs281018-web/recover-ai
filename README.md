@@ -1,2230 +1,893 @@
-\# RecoverAI
+# RecoverAI
 
+### AI-Powered Payment Failure & Revenue Recovery Agent
 
-
-\### AI-Powered Payment Failure \& Revenue Recovery Agent
-
-
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel)](https://recover-ai-app.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/mjs281018-web/recover-ai)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Razorpay](https://img.shields.io/badge/Razorpay-Webhook-blue)](https://razorpay.com/)
 
 <p align="center">
-
-
-
-\*\*RecoverAI intelligently analyzes failed payments, predicts recovery probability, selects recovery strategies, enforces financial policies, and safely executes recovery actions with human oversight.\*\*
-
-
-
-<br/>
-
-
-
-\[🚀 Live Demo](https://recover-ai-app.vercel.app/) · \[📦 GitHub Repository](https://github.com/mjs281018-web/recover-ai)
-
-
-
+  <strong>Intelligent payment recovery powered by AI decision-making, financial policy guardrails, human approval, verification, and complete auditability.</strong>
 </p>
 
+<p align="center">
+  <a href="https://recover-ai-app.vercel.app/">🚀 View Live Demo</a>
+  &nbsp;•&nbsp;
+  <a href="https://github.com/mjs281018-web/recover-ai">📦 View Source</a>
+</p>
 
+---
 
-\---
+## 🚀 Live Demo
 
+**Production:**  
+https://recover-ai-app.vercel.app/
 
+RecoverAI is deployed on Vercel as an interactive demonstration of an AI-powered payment recovery agent.
 
-\## 🌐 Live Demo
+> **Demo Safety:** The current deployment uses synthetic payment data and dry-run recovery operations. No real customer charges or real money movement are performed.
 
+---
 
-
-\### 🚀 Production Demo
-
-
-
-\*\*https://recover-ai-app.vercel.app/\*\*
-
-
-
-RecoverAI is deployed on Vercel and available as an interactive demonstration.
-
-
-
-> \*\*Demo Safety:\*\* The application currently runs using synthetic payment data and dry-run recovery operations. No real customer charges or real money movement are performed.
-
-
-
-\---
-
-
-
-\## 📌 Overview
-
-
+## 📌 Overview
 
 RecoverAI is an AI-powered revenue recovery platform designed to intelligently handle failed payment events.
 
+Instead of blindly retrying every failed payment, RecoverAI analyzes the failure context, estimates recovery probability, selects an appropriate recovery strategy, checks the decision against financial policies, requests human approval when required, verifies the result, and records the complete lifecycle.
 
+The core idea is:
 
-Instead of blindly retrying every failed payment, RecoverAI analyzes the failure context, estimates recovery probability, selects an appropriate recovery strategy, evaluates the action against financial safety policies, involves a human when required, verifies the outcome, and records the complete decision lifecycle.
+> **Don't just retry failed payments — intelligently decide what should happen next.**
 
+---
 
+## 🎯 Problem
 
-The platform demonstrates the concept of \*\*bounded AI autonomy for financial operations\*\*.
+Payment failures can result in significant revenue loss and poor customer experience.
 
+Common failure scenarios include:
 
+- Bank declines
+- Insufficient funds
+- Network failures
+- Gateway timeouts
+- Processor errors
+- Expired cards
+- Expired mandates
+- Invalid accounts
+- Fraud signals
+- Lost cards
+- Repeated failed attempts
 
-\### Core Agent Pipeline
-
-
+A traditional payment system may simply retry the transaction:
 
 ```text
-
-Payment Failure
-
-&#x20;     ↓
-
-&#x20;  Observe
-
-&#x20;     ↓
-
-&#x20;  Analyze
-
-&#x20;     ↓
-
-&#x20;  Predict
-
-&#x20;     ↓
-
-&#x20;  Decide
-
-&#x20;     ↓
-
-&#x20;Policy Check
-
-&#x20;     ↓
-
-&#x20;     ├───────────────┐
-
-&#x20;     ↓               ↓
-
-&#x20;   Allow        Human Approval
-
-&#x20;     ↓               ↓
-
-&#x20;     └───────┬───────┘
-
-&#x20;             ↓
-
-&#x20;            Act
-
-&#x20;             ↓
-
-&#x20;           Verify
-
-&#x20;             ↓
-
-&#x20;           Audit
-
-```
-
-
-
-\---
-
-
-
-\# 🎯 Problem Statement
-
-
-
-Payment failures are a major source of lost revenue and poor customer experience.
-
-
-
-A failed payment can occur because of:
-
-
-
-\* Bank decline
-
-\* Insufficient funds
-
-\* Network failure
-
-\* Gateway timeout
-
-\* Processor error
-
-\* Expired card
-
-\* Expired mandate
-
-\* Invalid account
-
-\* Fraud signals
-
-\* Lost card
-
-\* Repeated payment attempts
-
-
-
-A traditional system often follows a simple approach:
-
-
-
-```text
-
 Payment Failed
-
-&#x20;     ↓
-
-Retry
-
-&#x20;     ↓
-
+      ↓
+    Retry
+      ↓
 Success / Failure
-
 ```
 
-
-
-However, retrying every failed payment is not always safe or effective.
-
-
+However, not every payment failure should be retried.
 
 For example:
 
+| Failure Scenario | Intelligent Response |
+|---|---|
+| Temporary network failure | Smart Retry |
+| Bank decline | Adaptive Retry |
+| Expired card | Update Payment Method |
+| Lost card | Block Retry |
+| Suspected fraud | Hold / Escalate |
+| High-value payment | Human Approval |
+| Repeated failures | Change Strategy |
 
+RecoverAI introduces an intelligent, policy-controlled recovery layer between payment failure and recovery action.
 
-| Situation                 | Appropriate Response                |
+---
 
-| ------------------------- | ----------------------------------- |
-
-| Temporary network failure | Smart retry                         |
-
-| Bank decline              | Adaptive retry / alternate strategy |
-
-| Expired card              | Update payment method               |
-
-| Lost card                 | Block retry                         |
-
-| Suspected fraud           | Hold / escalate                     |
-
-| High-value payment        | Human approval                      |
-
-| Repeated failures         | Change strategy                     |
-
-
-
-RecoverAI addresses this problem using an intelligent, policy-controlled recovery agent.
-
-
-
-\---
-
-
-
-\# 💡 Solution
-
-
+# 💡 Solution
 
 RecoverAI combines:
 
+**AI Decision Making + Payment Intelligence + Policy Guardrails + Human Approval + Verification + Auditability**
 
-
-\*\*AI Decision Making + Payment Intelligence + Recovery Strategies + Policy Guardrails + Human Approval + Verification + Auditability\*\*
-
-
-
-The system:
-
-
-
-1\. Receives a payment failure event.
-
-2\. Verifies the webhook.
-
-3\. Normalizes the payment information.
-
-4\. Identifies the failure root cause.
-
-5\. Estimates recovery probability.
-
-6\. Selects a recovery strategy.
-
-7\. Evaluates the decision against financial policies.
-
-8\. Requests human approval when required.
-
-9\. Executes an allowed recovery action.
-
-10\. Verifies the result.
-
-11\. Records the complete lifecycle.
-
-
-
-\---
-
-
-
-\# 🤖 AI Recovery Agent
-
-
-
-RecoverAI uses an eight-stage agent lifecycle.
-
-
-
-\## 1. Observe
-
-
-
-The agent collects relevant payment context.
-
-
-
-Inputs include:
-
-
-
-\* Payment amount
-
-\* Payment channel
-
-\* Failure status
-
-\* Customer information
-
-\* Previous attempts
-
-\* Risk level
-
-\* Gateway response information
-
-
-
-\---
-
-
-
-\## 2. Analyze
-
-
-
-The agent determines the likely root cause of the failure.
-
-
-
-Example:
-
-
+### Recovery Lifecycle
 
 ```text
-
-Failure:
-
-Bank declined
-
-
-
-Risk:
-
-High
-
-
-
-Customer:
-
-Demo Customer
-
-
-
-Channel:
-
-Card
-
+Payment Failure
+       ↓
+    Observe
+       ↓
+    Analyze
+       ↓
+    Predict
+       ↓
+     Decide
+       ↓
+  Policy Check
+       ↓
+ ┌─────┼──────────┐
+ ↓     ↓          ↓
+Allow  Approval   Block
+ ↓     ↓
+ └─────┬──────────┘
+       ↓
+      Act
+       ↓
+    Verify
+       ↓
+     Audit
 ```
 
+---
 
+# 🤖 AI Recovery Agent
 
-\---
+RecoverAI uses an eight-stage agent pipeline.
 
+### 1. Observe
 
+Collect payment and customer context:
 
-\## 3. Predict
+- Payment amount
+- Payment channel
+- Failure status
+- Customer information
+- Previous attempts
+- Risk level
+- Gateway response
 
+### 2. Analyze
 
-
-The system estimates the probability of successfully recovering the payment.
-
-
+Identify the likely root cause of the payment failure.
 
 Example:
 
+```text
+Failure:  Bank declined
+Risk:     High
+Channel:  Card
+Customer: Demo Customer
+```
 
+### 3. Predict
+
+Estimate the probability that the payment can be successfully recovered.
+
+Example:
 
 ```text
-
 Recovery Probability: 68%
-
-AI Confidence: 88%
-
+AI Confidence:        88%
 ```
 
+### 4. Decide
 
+Select the most appropriate recovery strategy.
 
-The prediction is used as a decision signal and does not independently authorize financial actions.
+Supported strategies include:
 
+- Smart Retry
+- Retry
+- Switch Payment Channel
+- Send Reminder
+- Update Payment Method
+- Human Approval
+- Escalate
+- Hold
+- Write-off
 
+### 5. Policy Check
 
-\---
+Every proposed action is evaluated by the policy engine.
 
-
-
-\## 4. Decide
-
-
-
-The agent evaluates available recovery strategies.
-
-
-
-Possible actions include:
-
-
-
-\* Smart retry
-
-\* Retry payment
-
-\* Switch payment channel
-
-\* Send payment reminder
-
-\* Update payment method
-
-\* Human approval
-
-\* Escalation
-
-\* Hold
-
-\* Write-off
-
-
-
-\---
-
-
-
-\## 5. Policy Check
-
-
-
-Every proposed action passes through the policy engine.
-
-
-
-The policy engine can return:
-
-
+Possible policy outcomes:
 
 ```text
-
 ALLOW
-
 APPROVAL REQUIRED
-
 BLOCK
-
 ```
 
+### 6. Act
 
+If permitted, the selected recovery action is executed.
 
-Example:
+In the current demo, recovery is **synthetic and dry-run only**.
 
+### 7. Verify
 
+The agent verifies whether the recovery action produced the expected result.
+
+### 8. Audit
+
+The complete decision lifecycle is recorded for traceability and review.
+
+---
+
+# 🛡️ Bounded AI Autonomy
+
+RecoverAI is designed around **bounded autonomy**.
+
+AI does not have unrestricted control over financial operations.
 
 ```text
-
-High-value payment
-
-&#x20;       ↓
-
-Human Approval
-
-
-
-Fraud suspected
-
-&#x20;       ↓
-
-Blocked / Escalated
-
-
-
-Lost card
-
-&#x20;       ↓
-
-Retry Blocked
-
-
-
-Normal recoverable failure
-
-&#x20;       ↓
-
-Autonomous Recovery Allowed
-
+                AI Decision
+                     ↓
+               Policy Engine
+                     ↓
+        ┌────────────┼────────────┐
+        ↓            ↓            ↓
+      ALLOW       APPROVAL       BLOCK
+        ↓            ↓
+   Autonomous      Human
+     Action        Review
+        ↓            ↓
+        └──────┬─────┘
+               ↓
+            Verify
+               ↓
+             Audit
 ```
 
+### Autonomous Actions
 
+Low-risk operations can be executed automatically.
 
-\---
+### Human Approval
 
+Sensitive operations can be routed to a human reviewer.
 
+### Blocked Actions
 
-\## 6. Act
+Unsafe or prohibited actions are prevented by policy.
 
+---
 
-
-If the action is permitted, RecoverAI executes the recovery operation.
-
-
-
-In the current demo, the operation is synthetic.
-
-
-
-Example:
-
-
-
-```text
-
-Synthetic Retry
-
-&#x20;     ↓
-
-Success
-
-&#x20;     ↓
-
-Payment → Recovered
-
-```
-
-
-
-No real payment is attempted.
-
-
-
-\---
-
-
-
-\## 7. Verify
-
-
-
-The agent verifies the result of the recovery action.
-
-
-
-Example:
-
-
-
-```text
-
-Action:
-
-Smart Retry
-
-
-
-Result:
-
-Successful
-
-
-
-Verification:
-
-Passed
-
-```
-
-
-
-\---
-
-
-
-\## 8. Audit
-
-
-
-The complete lifecycle is recorded in the audit trail.
-
-
-
-Audit information includes:
-
-
-
-\* Payment ID
-
-\* Agent decision
-
-\* Policy result
-
-\* Recovery action
-
-\* Verification result
-
-\* Approval decision
-
-\* Timestamp
-
-\* Acting entity
-
-
-
-This makes AI decisions traceable and reviewable.
-
-
-
-\---
-
-
-
-\# 🛡️ Bounded Autonomy
-
-
-
-RecoverAI follows a simple principle:
-
-
-
-> \*\*AI should act autonomously only within predefined financial and safety boundaries.\*\*
-
-
-
-\### ✅ Autonomous Actions
-
-
-
-Appropriate low-risk actions can be executed autonomously:
-
-
-
-\* Low-risk retries
-
-\* Smart retries
-
-\* Customer notifications
-
-\* Approved recovery strategies
-
-
-
-\### 👤 Human Approval
-
-
-
-Human intervention is required for:
-
-
-
-\* High-value transactions
-
-\* Policy exceptions
-
-\* High-risk actions
-
-\* Controlled financial operations
-
-
-
-\### 🚫 Blocked Actions
-
-
-
-The system can prevent:
-
-
-
-\* Out-of-policy actions
-
-\* Unsafe recovery attempts
-
-\* Fraud-related retries
-
-\* Lost-card retries
-
-\* Restricted operations
-
-
-
-This creates a \*\*Human-in-the-Loop + Policy-Controlled AI\*\* architecture.
-
-
-
-\---
-
-
-
-\# 💳 Razorpay Integration
-
-
+# 💳 Razorpay Integration
 
 RecoverAI includes a demo-safe Razorpay webhook integration.
 
-
-
-\### Integration Flow
-
-
+### Webhook Flow
 
 ```text
-
-Razorpay payment.failed
-
-&#x20;         ↓
-
-&#x20;     Webhook
-
-&#x20;         ↓
-
-&#x20;Signature Verification
-
-&#x20;         ↓
-
-&#x20; Razorpay Adapter
-
-&#x20;         ↓
-
-&#x20;Payment Normalization
-
-&#x20;         ↓
-
-&#x20;RecoverAI Agent
-
-&#x20;         ↓
-
-&#x20;   Policy Engine
-
-&#x20;         ↓
-
-&#x20;Recovery Decision
-
+Razorpay
+   │
+   │ payment.failed
+   ↓
+Webhook Endpoint
+   ↓
+Signature Verification
+   ↓
+Razorpay Adapter
+   ↓
+Payment Normalization
+   ↓
+RecoverAI Agent
+   ↓
+Policy Engine
+   ↓
+Recovery Decision
 ```
 
+### Supported Integration
 
+- `payment.failed` event handling
+- Webhook signature verification
+- HMAC-SHA256 validation
+- Event ID handling
+- Payment normalization
+- Failure reason mapping
+- Risk classification
+- Recovery strategy recommendation
+- Policy evaluation
+- Dry-run recovery
 
-\### Supported Capabilities
+---
 
+# 🔐 Webhook Security
 
-
-\* `payment.failed` event handling
-
-\* Webhook signature verification
-
-\* HMAC-SHA256 validation
-
-\* Event ID handling
-
-\* Payment normalization
-
-\* Failure reason mapping
-
-\* Risk classification
-
-\* Recovery action recommendation
-
-\* Policy evaluation
-
-\* Dry-run recovery
-
-
-
-\---
-
-
-
-\# 🔐 Webhook Security
-
-
-
-RecoverAI validates incoming webhook signatures using HMAC-SHA256.
-
-
+Incoming Razorpay webhook requests are verified using HMAC-SHA256.
 
 ```text
-
 Incoming Webhook
-
-&#x20;      ↓
-
-&#x20;  Raw Request Body
-
-&#x20;      ↓
-
+       ↓
+Raw Request Body
+       ↓
 X-Razorpay-Signature
-
-&#x20;      ↓
-
-&#x20;Generate HMAC-SHA256
-
-&#x20;      ↓
-
+       ↓
+HMAC-SHA256
+       ↓
 Timing-Safe Comparison
-
-&#x20;      ↓
-
-&#x20;Verified / Rejected
-
+       ↓
+Verified / Rejected
 ```
-
-
 
 Invalid or missing signatures are rejected.
 
+---
 
+# 👤 Human-in-the-Loop
 
-\---
-
-
-
-\# 👤 Human-in-the-Loop
-
-
-
-Financial automation should not always be fully autonomous.
-
-
-
-RecoverAI provides an approval workflow:
-
-
+RecoverAI supports human approval for actions that should not be executed autonomously.
 
 ```text
-
 AI Decision
-
-&#x20;    ↓
-
+     ↓
 Policy Evaluation
-
-&#x20;    ↓
-
+     ↓
 Approval Required
-
-&#x20;    ↓
-
+     ↓
 Human Review
-
-&#x20;    ↓
-
+     ↓
 Approve / Reject
-
-&#x20;    ↓
-
+     ↓
 Continue / Stop
-
 ```
-
-
 
 Approval records include:
 
+- Payment ID
+- Amount
+- Reason
+- Risk level
+- Requested by
+- Approval status
+- Decision timestamp
+- Decision maker
 
+---
 
-\* Payment ID
+# 🧠 Explainable AI
 
-\* Amount
-
-\* Reason
-
-\* Risk level
-
-\* Requested by
-
-\* Approval status
-
-\* Decision timestamp
-
-\* Decision maker
-
-
-
-\---
-
-
-
-\# 🧠 Explainable AI Decisions
-
-
-
-RecoverAI provides reasoning behind its decisions rather than only displaying an action.
-
-
+RecoverAI exposes the reasoning behind recovery decisions.
 
 Example:
 
-
-
 ```text
-
 Root Cause:
-
 Bank declined
 
-
-
 Recovery Probability:
-
 68%
 
-
-
 AI Confidence:
-
 88%
 
-
-
 Risk:
-
 High
-
-
 
 Previous Attempts:
-
 2
 
-
-
 Matched Strategy:
-
 Soft decline smart retry
 
-
-
 Policy:
-
 PL-01
-
-
 
 Final Decision:
-
-Smart retry
-
-```
-
-
-
-The AI Decision Panel displays:
-
-
-
-\* Root cause
-
-\* Recovery probability
-
-\* AI confidence
-
-\* Risk level
-
-\* Policy result
-
-\* Recommended action
-
-\* Decision factors
-
-\* Alternatives considered
-
-\* AI rationale
-
-
-
-\---
-
-
-
-\# 📊 Recovery Intelligence
-
-
-
-The platform provides a command center for monitoring revenue recovery.
-
-
-
-Key intelligence includes:
-
-
-
-\* Revenue at risk
-
-\* Recoverable revenue
-
-\* Revenue recovered
-
-\* Recovery rate
-
-\* AI actions
-
-\* Human escalations
-
-\* Safety blocks
-
-\* Recovery funnel
-
-\* Failure intelligence
-
-\* Risk analysis
-
-\* Customer segmentation
-
-\* Recovery probability
-
-\* AI confidence
-
-\* Recent recovery activity
-
-
-
-> All dashboard metrics in the current demo are synthetic demonstration values.
-
-
-
-\---
-
-
-
-\# 🔄 Example Recovery Scenario
-
-
-
-\### Failed Payment
-
-
-
-```text
-
-Payment:
-
-RZP-297595
-
-
-
-Amount:
-
-₹499
-
-
-
-Channel:
-
-Card
-
-
-
-Failure:
-
-Bank declined
-
-
-
-Risk:
-
-High
-
-```
-
-
-
-\### Prediction
-
-
-
-```text
-
-Recovery Probability:
-
-68%
-
-
-
-AI Confidence:
-
-88%
-
-```
-
-
-
-\### Decision
-
-
-
-```text
-
 Smart Retry
-
 ```
 
+The AI Decision Panel can display:
 
+- Root cause
+- Recovery probability
+- AI confidence
+- Risk level
+- Policy result
+- Recommended action
+- Decision factors
+- AI rationale
 
-\### Policy
+---
 
+# 📊 Recovery Intelligence
 
+The RecoverAI command center provides visibility into the recovery lifecycle.
+
+### Key Metrics
+
+- Revenue at risk
+- Recoverable revenue
+- Revenue recovered
+- Recovery rate
+- AI decisions
+- Human escalations
+- Safety blocks
+- Recovery funnel
+- Failure intelligence
+- Risk analysis
+- Customer segmentation
+- Recovery probability
+- AI confidence
+- Recent agent activity
+
+> Dashboard values in the current deployment are synthetic demonstration data.
+
+---
+
+# 🔄 Demo Scenario
+
+A typical RecoverAI demonstration follows this flow:
+
+### Failed Payment
 
 ```text
+Payment ID:  RZP-297595
+Amount:     ₹499
+Channel:   Card
+Failure:    Bank declined
+Risk:       High
+```
 
+### AI Prediction
+
+```text
+Recovery Probability: 68%
+AI Confidence:        88%
+```
+
+### AI Decision
+
+```text
+Smart Retry
+```
+
+### Policy
+
+```text
 PL-01
-
-Autonomous Action Allowed
-
+Allowed
 ```
 
-
-
-\### Execution
-
-
+### Recovery
 
 ```text
-
 Synthetic Retry
-
-&#x20;     ↓
-
-Success
-
+       ↓
+    Success
 ```
 
-
-
-\### Final Result
-
-
+### Final State
 
 ```text
-
-Payment:
-
-RECOVERED
-
-
-
-Verification:
-
-PASSED
-
-
-
-Audit:
-
-RECORDED
-
+Payment:      RECOVERED
+Verification: PASSED
+Audit:        RECORDED
 ```
 
+---
 
-
-\---
-
-
-
-\# 🏗️ System Architecture
-
-
+# 🏗️ System Architecture
 
 ```text
-
-&#x20;                        ┌─────────────────────┐
-
-&#x20;                        │   Payment Gateway   │
-
-&#x20;                        │      Razorpay       │
-
-&#x20;                        └──────────┬──────────┘
-
-&#x20;                                   │
-
-&#x20;                                   │ payment.failed
-
-&#x20;                                   ▼
-
-&#x20;                        ┌─────────────────────┐
-
-&#x20;                        │   Webhook Verifier  │
-
-&#x20;                        │     HMAC-SHA256     │
-
-&#x20;                        └──────────┬──────────┘
-
-&#x20;                                   │
-
-&#x20;                                   ▼
-
-&#x20;                        ┌─────────────────────┐
-
-&#x20;                        │   Razorpay Adapter  │
-
-&#x20;                        │  Event Normalizer   │
-
-&#x20;                        └──────────┬──────────┘
-
-&#x20;                                   │
-
-&#x20;                                   ▼
-
-&#x20;             ┌────────────────────────────────────────┐
-
-&#x20;             │            RecoverAI Agent              │
-
-&#x20;             │                                        │
-
-&#x20;             │ Observe → Analyze → Predict → Decide  │
-
-&#x20;             │ → Policy Check → Act → Verify → Audit │
-
-&#x20;             └────────────────────┬───────────────────┘
-
-&#x20;                                  │
-
-&#x20;                    ┌─────────────┼──────────────┐
-
-&#x20;                    │             │              │
-
-&#x20;                    ▼             ▼              ▼
-
-&#x20;               ┌─────────┐ ┌─────────────┐ ┌─────────┐
-
-&#x20;               │  ALLOW  │ │   HUMAN     │ │  BLOCK  │
-
-&#x20;               │         │ │  APPROVAL   │ │         │
-
-&#x20;               └────┬────┘ └──────┬──────┘ └─────────┘
-
-&#x20;                    │             │
-
-&#x20;                    └──────┬──────┘
-
-&#x20;                           ▼
-
-&#x20;                  ┌─────────────────┐
-
-&#x20;                  │ Recovery Action │
-
-&#x20;                  │    Dry Run      │
-
-&#x20;                  └────────┬────────┘
-
-&#x20;                           ▼
-
-&#x20;                  ┌─────────────────┐
-
-&#x20;                  │    Verify       │
-
-&#x20;                  └────────┬────────┘
-
-&#x20;                           ▼
-
-&#x20;                  ┌─────────────────┐
-
-&#x20;                  │   Audit Trail   │
-
-&#x20;                  └─────────────────┘
-
+┌─────────────────────────────┐
+│       Payment Gateway       │
+│          Razorpay           │
+└──────────────┬──────────────┘
+               │
+               │ payment.failed
+               ↓
+┌─────────────────────────────┐
+│     Webhook Verification    │
+│        HMAC-SHA256          │
+└──────────────┬──────────────┘
+               │
+               ↓
+┌─────────────────────────────┐
+│      Razorpay Adapter       │
+│      Event Normalizer       │
+└──────────────┬──────────────┘
+               │
+               ↓
+┌────────────────────────────────────────┐
+│           RecoverAI Agent              │
+│                                        │
+│ Observe → Analyze → Predict → Decide   │
+│ Policy Check → Act → Verify → Audit    │
+└───────────────────┬────────────────────┘
+                    │
+          ┌─────────┼─────────┐
+          ↓         ↓         ↓
+       ┌──────┐ ┌────────┐ ┌───────┐
+       │ALLOW │ │APPROVAL│ │ BLOCK │
+       └──┬───┘ └───┬────┘ └───────┘
+          │         │
+          └────┬────┘
+               ↓
+      ┌─────────────────┐
+      │ Recovery Action │
+      │    Dry Run      │
+      └────────┬────────┘
+               ↓
+      ┌─────────────────┐
+      │     Verify      │
+      └────────┬────────┘
+               ↓
+      ┌─────────────────┐
+      │   Audit Trail   │
+      └─────────────────┘
 ```
 
-
-
-\---
-
-
-
-\# 🛠️ Technology Stack
-
-
-
-\## Frontend
-
-
-
-\* Next.js 16
-
-\* React 19
-
-\* TypeScript
-
-\* Tailwind CSS
-
-\* shadcn-style UI
-
-\* Lucide React
-
-
-
-\## Backend
-
-
-
-\* Next.js App Router
-
-\* Next.js API Routes
-
-\* TypeScript
-
-
-
-\## AI / Decision Layer
-
-
-
-\* AI decision abstraction
-
-\* Deterministic AI fallback
-
-\* Recovery probability estimation
-
-\* Strategy selection
-
-\* Explainable decision factors
-
-
-
-\## Payment Integration
-
-
-
-\* Razorpay webhook integration
-
-\* HMAC-SHA256 verification
-
-\* Synthetic payment provider
-
-\* Dry-run recovery execution
-
-
-
-\## Safety \& Governance
-
-
-
-\* Policy engine
-
-\* Human approval workflow
-
-\* Risk guardrails
-
-\* Audit trail
-
-\* Runtime event tracking
-
-
-
-\## Deployment
-
-
-
-\* GitHub
-
-\* Vercel
-
-
-
-\---
-
-
-
-\# 📁 Project Structure
-
-
+---
+
+# 🛠️ Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js, React, TypeScript |
+| UI | Tailwind CSS, shadcn-style components, Lucide |
+| Backend | Next.js App Router, API Routes |
+| AI Layer | AI Decision Abstraction, Deterministic Fallback |
+| Payments | Razorpay Webhooks, Synthetic Payment Provider |
+| Security | HMAC-SHA256, Policy Engine |
+| Governance | Human Approval, Risk Guardrails, Audit Trail |
+| Deployment | Vercel |
+| Version Control | Git, GitHub |
+
+---
+
+# 📁 Project Structure
 
 ```text
-
 recover-ai/
-
 │
-
 ├── app/
-
 │   ├── agent/
-
 │   ├── api/
-
 │   │   ├── ai/
-
 │   │   └── webhooks/
-
 │   │       └── razorpay/
-
 │   ├── analytics/
-
 │   ├── approvals/
-
 │   ├── audit-trail/
-
 │   ├── at-risk-payments/
-
 │   ├── batch-recovery/
-
 │   ├── customers/
-
-│   ├── recovery-strategies/
-
-│   └── ...
-
+│   └── recovery-strategies/
 │
-
 ├── components/
-
 │   ├── agent/
-
 │   ├── dashboard/
-
 │   └── ui/
-
 │
-
 ├── data/
-
 │   └── demo.ts
-
 │
-
 ├── lib/
-
 │   ├── providers/
-
 │   ├── razorpay/
-
 │   └── runtime-events.ts
-
 │
-
 ├── services/
-
 │   ├── agent-service.ts
-
 │   ├── approval-service.ts
-
 │   ├── audit-service.ts
-
 │   ├── payment-service.ts
-
 │   └── policy-service.ts
-
 │
-
 ├── types/
-
 │   └── index.ts
-
 │
-
-├── .env.local
-
 ├── package.json
-
 ├── tsconfig.json
-
 └── README.md
-
 ```
 
+---
 
+# ⚙️ Getting Started
 
-\---
+## Prerequisites
 
+- Node.js 20+
+- npm
+- Git
 
-
-\# ⚙️ Getting Started
-
-
-
-\## Prerequisites
-
-
-
-Install:
-
-
-
-\* Node.js 20+
-
-\* npm
-
-\* Git
-
-
-
-\---
-
-
-
-\## 1. Clone Repository
-
-
+## Clone
 
 ```bash
-
 git clone https://github.com/mjs281018-web/recover-ai.git
-
 cd recover-ai
-
 ```
 
-
-
-\---
-
-
-
-\## 2. Install Dependencies
-
-
+## Install Dependencies
 
 ```bash
-
 npm install
-
 ```
 
-
-
-\---
-
-
-
-\## 3. Configure Environment Variables
-
-
+## Environment Variables
 
 Create `.env.local`:
 
-
-
 ```env
-
-PAYMENT\_PROVIDER=synthetic
-
-RAZORPAY\_WEBHOOK\_SECRET=your\_demo\_webhook\_secret
-
+PAYMENT_PROVIDER=synthetic
+RAZORPAY_WEBHOOK_SECRET=your_demo_webhook_secret
 ```
 
+> Never commit real API keys, webhook secrets, or credentials.
 
-
-> Never commit real API keys, webhook secrets, or credentials to GitHub.
-
-
-
-\---
-
-
-
-\## 4. Run Development Server
-
-
+## Run Locally
 
 ```bash
-
 npm run dev
-
 ```
-
-
 
 Open:
 
-
-
 ```text
-
 http://localhost:3000
-
 ```
 
-
-
-\---
-
-
-
-\## 5. Production Build
-
-
+## Production Build
 
 ```bash
-
 npm run build
-
 ```
 
+---
 
+# 🧪 Demo Instructions
 
-\---
+### 1. Open the Agent
 
-
-
-\# 🧪 Demo Guide
-
-
-
-The recommended demonstration flow is:
-
-
-
-\### Step 1 — Open the AI Agent
-
-
-
-Navigate to:
-
-
+Go to:
 
 ```text
-
 /agent
-
 ```
 
-
-
-\### Step 2 — Simulate Razorpay Failure
-
-
+### 2. Simulate Payment Failure
 
 Click:
 
+**Simulate Razorpay Payment Failure**
 
+### 3. Verify Webhook
 
-\*\*Simulate Razorpay Payment Failure\*\*
-
-
-
-The system creates a signed demo `payment.failed` webhook.
-
-
-
-\---
-
-
-
-\### Step 3 — Verify Webhook
-
-
-
-Expected:
-
-
+The system should show:
 
 ```text
-
 Webhook: Ready
-
 Signature: Verified
-
 Event: payment.failed
-
 Execution: Dry Run
-
 ```
 
+### 4. Review the Payment
 
-
-\---
-
-
-
-\### Step 4 — Payment Becomes At Risk
-
-
-
-The payment is registered in RecoverAI.
-
-
+The simulated payment is registered as:
 
 ```text
-
 Status: AT RISK
-
 ```
 
-
-
-The simulation itself does \*\*not\*\* execute recovery.
-
-
-
-\---
-
-
-
-\### Step 5 — Run Recovery
-
-
+### 5. Run Recovery
 
 Click:
 
+**Run Recovery**
 
+### 6. Observe the Agent
 
-\*\*Run Recovery\*\*
-
-
-
-\---
-
-
-
-\### Step 6 — Observe the Agent
-
-
-
-The complete lifecycle runs:
-
-
+The complete eight-stage lifecycle executes:
 
 ```text
-
 Observe
-
-&#x20;  ↓
-
+   ↓
 Analyze
-
-&#x20;  ↓
-
+   ↓
 Predict
-
-&#x20;  ↓
-
+   ↓
 Decide
-
-&#x20;  ↓
-
+   ↓
 Policy Check
-
-&#x20;  ↓
-
+   ↓
 Act
-
-&#x20;  ↓
-
+   ↓
 Verify
-
-&#x20;  ↓
-
+   ↓
 Audit
-
 ```
 
+### 7. Verify Result
 
-
-\---
-
-
-
-\### Step 7 — View Final Result
-
-
-
-Example:
-
-
+The payment should reach:
 
 ```text
-
-Recovery:
-
-Recovered
-
-
-
-Policy:
-
-Allowed
-
-
-
-Verification:
-
-Passed
-
-
-
-Audit:
-
-Recorded
-
+RECOVERED
 ```
 
+with verification and audit records updated.
 
+---
 
-\---
+# 🔒 Safety & Security
 
+RecoverAI is currently a controlled financial automation prototype.
 
+### Safety Controls
 
-\# 🔒 Safety \& Security
+- Webhook signature verification
+- Policy-based authorization
+- Risk classification
+- Human approval
+- Blocked action handling
+- Dry-run payment operations
+- Synthetic payment provider
+- Audit trail
+- No real money movement
 
+### The Current Demo Does Not
 
+- Charge real customers
+- Move real money
+- Perform real payment retries
+- Modify real merchant balances
+- Execute real financial transactions
 
-RecoverAI is designed as a controlled financial automation prototype.
+---
 
+# 🧩 AI Reliability
 
+RecoverAI includes an AI decision abstraction with a deterministic fallback.
 
-\### Current Safety Controls
-
-
-
-\* Webhook signature verification
-
-\* Policy-based authorization
-
-\* Risk classification
-
-\* Human approval
-
-\* Blocked action handling
-
-\* Dry-run payment operations
-
-\* Synthetic payment provider
-
-\* Audit trail
-
-\* No real money movement
-
-
-
-\### No Real Payment Operations
-
-
-
-The current demo does \*\*not\*\*:
-
-
-
-\* Charge real customers
-
-\* Move real money
-
-\* Perform real payment retries
-
-\* Modify real merchant balances
-
-
-
-All recovery operations are synthetic.
-
-
-
-\---
-
-
-
-\# 🧩 AI Reliability
-
-
-
-RecoverAI uses an AI decision abstraction with a deterministic fallback.
-
-
-
-When an external AI service is unavailable or not configured, the system can still generate a deterministic and explainable recovery decision.
-
-
+If an external AI service is unavailable or not configured, the system can still generate a deterministic recovery decision.
 
 This provides:
 
+- Predictable behavior
+- Explainability
+- Safe fallback execution
+- Reduced external dependency
+- Consistent policy enforcement
 
+The deterministic fallback is intended for demonstration and resilience and should not be considered a production-grade predictive model.
 
-\* Predictable behavior
+---
 
-\* Safe fallback execution
+# 📈 Project Status
 
-\* Explainability
-
-\* Reduced external dependency
-
-\* Reliable policy enforcement
-
-
-
-The deterministic fallback is intended for demonstration and resilience. It should not be interpreted as a production-grade predictive model.
-
-
-
-\---
-
-
-
-\# 📈 Current Capabilities
-
-
-
-| Capability                     | Status     |
-
-| ------------------------------ | ---------- |
-
-| AI Recovery Agent              | ✅ Complete |
-
-| 8-Stage Agent Pipeline         | ✅ Complete |
-
-| Payment Failure Analysis       | ✅ Complete |
-
-| Recovery Probability           | ✅ Complete |
-
-| Strategy Selection             | ✅ Complete |
-
-| Policy Engine                  | ✅ Complete |
-
-| Human Approval                 | ✅ Complete |
-
-| Blocked Actions                | ✅ Complete |
-
-| Audit Trail                    | ✅ Complete |
-
-| Synthetic Payment Provider     | ✅ Complete |
-
-| Razorpay Webhook Simulation    | ✅ Complete |
-
+| Feature | Status |
+|---|---|
+| AI Recovery Agent | ✅ Complete |
+| 8-Stage Agent Pipeline | ✅ Complete |
+| Payment Failure Analysis | ✅ Complete |
+| Recovery Probability | ✅ Complete |
+| Recovery Strategy Selection | ✅ Complete |
+| Policy Engine | ✅ Complete |
+| Human Approval | ✅ Complete |
+| Blocked Actions | ✅ Complete |
+| Audit Trail | ✅ Complete |
+| Synthetic Payment Provider | ✅ Complete |
+| Razorpay Webhook Simulation | ✅ Complete |
 | Webhook Signature Verification | ✅ Complete |
+| Dry-Run Recovery | ✅ Complete |
+| Vercel Deployment | ✅ Complete |
+| Production Demo | ✅ Ready |
 
-| Dry-Run Recovery               | ✅ Complete |
+---
 
-| Vercel Deployment              | ✅ Complete |
+# 🚀 Future Scope
 
-| Production Demo                | ✅ Ready    |
+- Production payment provider integrations
+- Real ML-based recovery prediction
+- LLM-powered payment failure reasoning
+- Customer behavioral modeling
+- Personalized recovery strategies
+- Multi-gateway optimization
+- Real-time payment anomaly detection
+- Advanced revenue forecasting
+- Continuous outcome-based learning
+- Multi-tenant merchant architecture
+- Role-based access control
+- Persistent production database
+- Advanced observability
+- Production-grade authentication and authorization
 
+---
 
+# 🏆 Why RecoverAI?
 
-\---
+RecoverAI is designed to move beyond simple payment retries.
 
-
-
-\# 🚀 Future Scope
-
-
-
-Potential future improvements include:
-
-
-
-\* Production-grade payment provider integrations
-
-\* Real ML-based recovery prediction
-
-\* LLM-powered failure reasoning
-
-\* Customer behavioral modeling
-
-\* Personalized recovery strategies
-
-\* Multi-gateway optimization
-
-\* Real-time payment anomaly detection
-
-\* Advanced revenue forecasting
-
-\* Continuous outcome-based learning
-
-\* Multi-tenant merchant architecture
-
-\* Role-based access control
-
-\* Persistent production database
-
-\* Advanced observability
-
-\* Production-grade authentication and authorization
-
-
-
-\---
-
-
-
-\# 🏆 Why RecoverAI?
-
-
-
-RecoverAI is more than a payment retry system.
-
-
-
-\### Traditional System
-
-
+### Traditional Approach
 
 ```text
-
 Payment Failed
-
-&#x20;     ↓
-
+      ↓
 Retry
-
-&#x20;     ↓
-
+      ↓
 Success / Failure
-
 ```
 
-
-
-\### RecoverAI
-
-
+### RecoverAI Approach
 
 ```text
-
 Payment Failed
-
-&#x20;     ↓
-
-Observe
-
-&#x20;     ↓
-
-Analyze Root Cause
-
-&#x20;     ↓
-
+      ↓
+Understand the Failure
+      ↓
 Predict Recovery Probability
-
-&#x20;     ↓
-
-Select Recovery Strategy
-
-&#x20;     ↓
-
-Evaluate Financial Policy
-
-&#x20;     ↓
-
+      ↓
+Select Strategy
+      ↓
+Check Financial Policy
+      ↓
 Allow / Approve / Block
-
-&#x20;     ↓
-
+      ↓
 Execute
-
-&#x20;     ↓
-
+      ↓
 Verify
-
-&#x20;     ↓
-
+      ↓
 Audit
-
 ```
 
-
-
-The result is a \*\*policy-controlled, explainable and auditable AI recovery agent\*\*.
-
-
-
-\---
-
-
-
-\# 🌟 Key Differentiators
-
-
-
-\### 🤖 AI-Driven Decision Making
-
-
-
-Uses payment context and recovery probability to select appropriate strategies.
-
-
-
-\### 🛡️ Bounded Autonomy
-
-
-
-AI operates within explicit financial and safety boundaries.
-
-
-
-\### 👤 Human-in-the-Loop
-
-
-
-Sensitive actions can be routed to human approval.
-
-
-
-\### 🔐 Secure Webhooks
-
-
-
-Incoming Razorpay webhook events are verified using HMAC-SHA256.
-
-
-
-\### 📊 Explainable Decisions
-
-
-
-The system exposes the signals and reasoning behind recovery decisions.
-
-
-
-\### 🚫 Safety Guardrails
-
-
-
-Unsafe and out-of-policy actions can be blocked.
-
-
-
-\### 🔎 Full Auditability
-
-
-
-Important agent actions and decisions are recorded.
-
-
-
-\### 🧪 Safe Demonstration
-
-
-
-Synthetic payments and dry-run recovery prevent real financial impact.
-
-
-
-\---
-
-
-
-\# 📜 Disclaimer
-
-
+This creates a:
+
+**Policy-Controlled + Explainable + Auditable AI Recovery Agent**
+
+---
+
+# 🌟 Key Differentiators
+
+| Capability | RecoverAI |
+|---|---|
+| AI-driven recovery decisions | ✅ |
+| Recovery probability | ✅ |
+| Explainable decisions | ✅ |
+| Policy guardrails | ✅ |
+| Human-in-the-loop | ✅ |
+| Risk-based decisions | ✅ |
+| Razorpay webhook integration | ✅ |
+| Webhook signature verification | ✅ |
+| Verification layer | ✅ |
+| Complete audit trail | ✅ |
+| Safe dry-run execution | ✅ |
+
+---
+
+# 📜 Disclaimer
 
 RecoverAI is currently a demonstration and prototype system.
 
-
-
 All payment records, customer information, dashboard metrics, recovery outcomes, and financial values displayed in the demo are synthetic.
-
-
 
 The current Razorpay integration is intended for webhook demonstration and does not perform real customer charges or real money movement.
 
+A production implementation would require additional security, authentication, authorization, compliance validation, payment-provider certification, persistent infrastructure, monitoring, financial controls, data protection, and production-grade AI/ML validation.
 
+---
 
-A production deployment would require additional:
+# 🔗 Links
 
-
-
-\* Security controls
-
-\* Authentication
-
-\* Authorization
-
-\* Compliance validation
-
-\* Payment-provider certification
-
-\* Persistent database infrastructure
-
-\* Monitoring
-
-\* Financial risk controls
-
-\* Data protection
-
-\* Production-grade AI/ML validation
-
-
-
-\---
-
-
-
-\# 📦 Project Links
-
-
-
-\### 🚀 Live Demo
-
-
+### 🚀 Live Demo
 
 https://recover-ai-app.vercel.app/
 
-
-
-\### 📦 GitHub Repository
-
-
+### 📦 GitHub Repository
 
 https://github.com/mjs281018-web/recover-ai
 
+---
 
+## 👨‍💻 RecoverAI
 
-\---
+**AI-Powered Payment Failure & Revenue Recovery Agent**
 
+Built with:
 
+**Next.js · React · TypeScript · Tailwind CSS · Razorpay Webhooks · AI Decision Layer · Policy Engine · Human Approval · Audit Trail · Vercel**
 
-\# 👨‍💻 RecoverAI
+---
 
-
-
-\*\*AI-Powered Payment Failure \& Revenue Recovery Agent\*\*
-
-
-
-Built using:
-
-
-
-```text
-
-Next.js
-
-React
-
-TypeScript
-
-Tailwind CSS
-
-Razorpay Webhooks
-
-AI Decision Layer
-
-Policy Engine
-
-Human Approval
-
-Audit Trail
-
-GitHub
-
-Vercel
-
-```
-
-
-
-\---
-
-
-
-\### ⭐ Support the Project
-
-
-
-If you find RecoverAI interesting, consider giving the repository a ⭐
-
+<p align="center">
+  ⭐ If you find RecoverAI interesting, consider starring the repository.
+</p>

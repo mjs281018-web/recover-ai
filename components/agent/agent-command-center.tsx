@@ -1,31 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import {
-  Eye,
-  Brain,
-  TrendingUp,
-  Zap,
-  ShieldCheck,
-  Send,
-  CircleCheck as CheckCircle2,
-  ScrollText,
-  ChevronDown,
-  Check,
-  CircleDot,
-  ShieldAlert,
-  ShieldOff,
-  Lock,
-  Cpu,
-  Activity,
-  Sparkles,
-  Play,
-  Pause,
-  RotateCcw,
-  SkipForward,
-} from 'lucide-react'
+import { Eye, Brain, TrendingUp, Zap, ShieldCheck, Send, CircleCheck as CheckCircle2, ScrollText, ChevronDown, Check, CircleDot, ShieldAlert, ShieldOff, Lock, Cpu, Activity, Sparkles, Play, Pause, RotateCcw, SkipForward, CircleAlert as AlertCircle, CircleCheckBig } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+
+import { RecoveryLoopSpinner } from '@/components/brand/recovery-loop-spinner'
 
 import {
   Card,
@@ -437,6 +417,8 @@ export function AgentCommandCenter({
   const [approvalResolved, setApprovalResolved] =
     useState(false)
 
+  const [demoError, setDemoError] = useState<string | null>(null)
+
   const playingRef = useRef(false)
   const executedRef = useRef(0)
   const selectedRef = useRef(selectedPaymentId)
@@ -683,6 +665,7 @@ export function AgentCommandCenter({
     playingRef.current = true
     setPlayback('playing')
     setBusy(true)
+    setDemoError(null)
 
     try {
       let result:
@@ -717,6 +700,16 @@ export function AgentCommandCenter({
             ? 'done'
             : 'paused',
         )
+      }
+    } catch (err) {
+      if (runIdRef.current === runId) {
+        playingRef.current = false
+        setDemoError(
+          err instanceof Error
+            ? err.message
+            : String(err),
+        )
+        setPlayback('paused')
       }
     } finally {
       if (runIdRef.current === runId) {
@@ -758,6 +751,7 @@ export function AgentCommandCenter({
 
     setApprovalStatus('pending')
     setApprovalResolved(false)
+    setDemoError(null)
 
     setPlayback('idle')
     setBusy(false)
@@ -826,6 +820,7 @@ export function AgentCommandCenter({
     playingRef.current = false
     runIdRef.current += 1
     setBusy(true)
+    setDemoError(null)
 
     const approval =
       await decideRecoveryApproval(
@@ -843,7 +838,7 @@ export function AgentCommandCenter({
     setApprovalResolved(true)
 
     if (decision === 'rejected') {
-      setPlayback('paused')
+      setPlayback('done')
       setBusy(false)
       return
     }
@@ -886,6 +881,16 @@ export function AgentCommandCenter({
             ? 'done'
             : 'paused',
         )
+      }
+    } catch (err) {
+      if (runIdRef.current === runId) {
+        playingRef.current = false
+        setDemoError(
+          err instanceof Error
+            ? err.message
+            : String(err),
+        )
+        setPlayback('paused')
       }
     } finally {
       if (runIdRef.current === runId) {
@@ -1036,70 +1041,97 @@ export function AgentCommandCenter({
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            {/* ONE-CLICK DEMO BUTTON */}
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ai/20 bg-ai-muted/10 p-3">
               <Button
                 type="button"
-                size="sm"
+                size="lg"
                 onClick={() => void handlePlay()}
-                disabled={!canPlay}
-                className="gap-1.5"
+                disabled={busy || !canPlay}
+                className="gap-2"
               >
-                <Play className="size-3.5" />
-                Play
+                {playback === 'playing' ? (
+                  <RecoveryLoopSpinner className="size-4 text-primary-foreground" />
+                ) : (
+                  <Play className="size-4" />
+                )}
+                {playback === 'playing'
+                  ? 'Running Demo...'
+                  : finished
+                    ? 'Demo Complete'
+                    : 'Run Full Recovery Demo'}
               </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handlePause}
-                disabled={!canPause}
-                className="gap-1.5"
-              >
-                <Pause className="size-3.5" />
-                Pause
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePause}
+                  disabled={!canPause}
+                  className="gap-1.5"
+                >
+                  <Pause className="size-3.5" />
+                  Pause
+                </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleStep()}
-                disabled={!canStep}
-                className="gap-1.5"
-              >
-                <SkipForward className="size-3.5" />
-                Step
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleStep()}
+                  disabled={!canStep}
+                  className="gap-1.5"
+                >
+                  <SkipForward className="size-3.5" />
+                  Step
+                </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void handleReset()}
-                disabled={
-                  busy && playback === 'playing'
-                }
-                className="gap-1.5"
-              >
-                <RotateCcw className="size-3.5" />
-                Reset
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void handleReset()}
+                  disabled={busy && playback === 'playing'}
+                  className="gap-1.5"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Reset Demo
+                </Button>
+              </div>
 
               {selectedPayment && (
-                <span className="text-xs text-muted-foreground">
-                  {selectedPayment.customerName} ·{' '}
-                  {formatCurrency(
-                    selectedPayment.amount,
-                  )}{' '}
-                  ·{' '}
-                  {selectedPayment.status.replace(
-                    '-',
-                    ' ',
-                  )}
-                </span>
+                <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                  <span>
+                    <span className="font-medium text-foreground">
+                      {selectedPayment.id}
+                    </span>{' '}
+                    · {selectedPayment.customerName} ·{' '}
+                    {formatCurrency(selectedPayment.amount)}
+                  </span>
+                  <span className="capitalize">
+                    Status: {selectedPayment.status.replace('-', ' ')}
+                    {' · '}Channel: {selectedPayment.channel}
+                    {' · '}Risk: {selectedPayment.risk}
+                  </span>
+                </div>
               )}
             </div>
+
+            {/* DEMO ERROR */}
+            {demoError && (
+              <div className="flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-muted/20 px-3 py-2.5 text-sm">
+                <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
+                <div>
+                  <div className="font-medium text-danger">
+                    Demo error
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {demoError}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* HUMAN APPROVAL REQUIRED */}
 
@@ -1183,6 +1215,133 @@ export function AgentCommandCenter({
           </div>
         </CardContent>
       </Card>
+
+      {/* ========================================================= */}
+      {/* JUDGE DEMO COMPLETION SUMMARY                            */}
+      {/* ========================================================= */}
+
+      {finished && !demoError && (
+        <Card
+          className={cn(
+            'border-success/30',
+            policyEvaluation?.blocked
+              ? 'border-danger/30'
+              : approvalStatus === 'rejected'
+                ? 'border-danger/30'
+                : 'border-success/30',
+          )}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2">
+              {policyEvaluation?.blocked ? (
+                <ShieldOff className="size-5 text-danger" />
+              ) : approvalStatus === 'rejected' ? (
+                <ShieldOff className="size-5 text-danger" />
+              ) : (
+                <CircleCheckBig className="size-5 text-success" />
+              )}
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                {policyEvaluation?.blocked
+                  ? 'RECOVERY DEMO COMPLETE — BLOCKED'
+                  : approvalStatus === 'rejected'
+                    ? 'RECOVERY DEMO COMPLETE — REJECTED'
+                    : 'RECOVERY DEMO COMPLETE'}
+              </h3>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <SummaryRow label="Payment" value={selectedPayment?.id ?? '—'} mono />
+              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? '—'} />
+              <SummaryRow label="Amount" value={selectedPayment ? formatCurrency(selectedPayment.amount) : '—'} />
+              <SummaryRow
+                label="AI Decision"
+                value={featuredDecision ? RECOVERY_ACTION_LABELS[featuredDecision.recommendedAction] : '—'}
+              />
+              <SummaryRow
+                label="Recovery Probability"
+                value={featuredPrediction ? formatPercent(featuredPrediction.recoveryProbability) : '—'}
+              />
+              <SummaryRow
+                label="AI Confidence"
+                value={featuredPrediction ? formatPercent(featuredPrediction.confidence) : '—'}
+              />
+              <SummaryRow
+                label="AI Source"
+                value={
+                  featuredDecision?.aiRecommendation
+                    ? featuredDecision.aiRecommendation.source === 'ai-llm'
+                      ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
+                      : 'Deterministic AI fallback'
+                    : '—'
+                }
+              />
+              <SummaryRow
+                label="Policy"
+                value={
+                  policyEvaluation
+                    ? policyEvaluation.blocked
+                      ? `Blocked · ${policyEvaluation.policyId}`
+                      : policyEvaluation.requiresApproval
+                        ? `Approval required · ${policyEvaluation.policyId}`
+                        : `Allowed · ${policyEvaluation.policyId}`
+                    : '—'
+                }
+                tone={
+                  policyEvaluation?.blocked
+                    ? 'danger'
+                    : policyEvaluation?.requiresApproval
+                      ? 'warning'
+                      : 'success'
+                }
+              />
+              <SummaryRow
+                label="Recovery"
+                value={
+                  verifyResult
+                    ? verifyResult.status === 'recovered'
+                      ? 'Recovered'
+                      : verifyResult.status === 'blocked'
+                        ? 'Blocked'
+                        : verifyResult.status.replace('-', ' ')
+                    : policyEvaluation?.blocked
+                      ? 'Not executed'
+                      : '—'
+                }
+                tone={
+                  verifyResult?.status === 'recovered'
+                    ? 'success'
+                    : verifyResult?.status === 'blocked' || policyEvaluation?.blocked
+                      ? 'danger'
+                      : 'neutral'
+                }
+              />
+              <SummaryRow
+                label="Verification"
+                value={verifyResult ? verifyResult.message : '—'}
+              />
+              <SummaryRow
+                label="Audit"
+                value={auditEvent ? `Recorded · ${auditEvent.id}` : 'Recorded'}
+                tone="success"
+              />
+            </div>
+
+            {policyEvaluation?.blocked && (
+              <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
+                <span className="font-medium text-danger">Policy block: </span>
+                <span className="text-muted-foreground">{policyEvaluation.reason}</span>
+              </div>
+            )}
+
+            {approvalStatus === 'rejected' && approvalResolved && (
+              <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
+                <span className="font-medium text-danger">Approval rejected — </span>
+                <span className="text-muted-foreground">recovery halted and recorded in the audit trail.</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ========================================================= */}
       {/* RECOVERY LIFECYCLE                                       */}
@@ -2418,6 +2577,44 @@ function StageExtras({
           </span>
         </span>
       )}
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  value,
+  mono,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  mono?: boolean
+  tone?: 'neutral' | 'success' | 'warning' | 'danger'
+}) {
+  const toneClass =
+    tone === 'success'
+      ? 'text-success'
+      : tone === 'warning'
+        ? 'text-warning'
+        : tone === 'danger'
+          ? 'text-danger'
+          : 'text-foreground'
+
+  return (
+    <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-surface/40 p-3">
+      <span className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+        {label}
+      </span>
+      <span
+        className={cn(
+          'text-sm font-medium',
+          mono && 'font-mono',
+          toneClass,
+        )}
+      >
+        {value}
+      </span>
     </div>
   )
 }

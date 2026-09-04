@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Customer service — account and mandate context for the recovery engine
  * and UI. Wraps the synthetic demo dataset for the foundation phase.
  */

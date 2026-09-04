@@ -193,12 +193,12 @@ export function RazorpayIntegrationPanel({
                 />
 
                 <ResultItem
-                  label="Policy"
+                  label="Initial Gateway Policy"
                   value={result.policy.policyId}
                 />
 
                 <ResultItem
-                  label="Decision"
+                  label="Initial Gateway Decision"
                   value={
                     blocked
                       ? 'Blocked'
@@ -280,3 +280,4 @@ function ResultItem({
     </div>
   )
 }
+

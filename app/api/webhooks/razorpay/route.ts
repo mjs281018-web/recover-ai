@@ -5,8 +5,6 @@ import {
   type RazorpayWebhookPayload,
 } from '@/lib/razorpay/mapper'
 import { evaluatePolicy } from '@/services/policy-service'
-import { recordAuditEvent } from '@/services/audit-service'
-import { notifyRuntimeChange } from '@/lib/runtime-events'
 
 const processedEventIds = new Set<string>()
 const MAX_IDEMPOTENCY_KEYS = 500
@@ -99,28 +97,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Policy is authoritative. No real Razorpay payment operation
-    // is performed by this webhook.
+    // Policy is authoritative.
+    // No real Razorpay payment operation is performed by this webhook.
     const evaluation = await evaluatePolicy(
       payment,
       payment.recommendedAction,
-    )
-
-    await recordAuditEvent({
-      id: `AUD-RZP-${eventId}`,
-      actor: 'system',
-      action: 'razorpay-webhook-received',
-      target: payment.id,
-      timestamp: new Date().toISOString(),
-      status:
-        evaluation.verdict === 'blocked'
-          ? 'blocked'
-          : 'info',
-    })
-
-    notifyRuntimeChange(
-      'payment-updated',
-      payment.id,
     )
 
     return NextResponse.json({

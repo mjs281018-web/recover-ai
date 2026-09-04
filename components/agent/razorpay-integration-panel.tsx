@@ -15,12 +15,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { Payment } from '@/types'
 
 type RazorpayResult = {
   ok: boolean
   status?: string
   eventId?: string
   paymentId?: string
+  payment?: Payment
   mode?: string
   realPaymentOperation?: boolean
   policy?: {
@@ -35,7 +37,13 @@ type RazorpayResult = {
   reason?: string
 }
 
-export function RazorpayIntegrationPanel() {
+export function RazorpayIntegrationPanel({
+  onPaymentReady,
+}: {
+  onPaymentReady?: (
+    payment: Payment,
+  ) => void | Promise<void>
+}) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<RazorpayResult | null>(null)
 
@@ -44,45 +52,24 @@ export function RazorpayIntegrationPanel() {
     setResult(null)
 
     try {
-      const response = await fetch('/api/webhooks/razorpay', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Razorpay-Signature': 'demo-signature',
-          'X-Razorpay-Event-Id': `evt_demo_${Date.now()}`,
+      const response = await fetch(
+        '/api/webhooks/razorpay/simulate',
+        {
+          method: 'POST',
         },
-        body: JSON.stringify({
-          entity: 'event',
-          account_id: 'acc_demo',
-          event: 'payment.failed',
-          contains: ['payment'],
-          created_at: Math.floor(Date.now() / 1000),
-          payload: {
-            payment: {
-              entity: {
-                id: `pay_demo_${Date.now()}`,
-                amount: 49900,
-                currency: 'INR',
-                status: 'failed',
-                method: 'card',
-                email: 'demo.customer@example.com',
-                contact: '9999999999',
-                description: 'RecoverAI Demo Payment',
-                order_id: 'order_demo_001',
-                error_code: 'BAD_REQUEST_ERROR',
-                error_description: 'Bank declined the payment',
-                notes: {
-                  customer_name: 'Demo Customer',
-                },
-                created_at: Math.floor(Date.now() / 1000),
-              },
-            },
-          },
-        }),
-      })
+      )
 
       const data = (await response.json()) as RazorpayResult
+
       setResult(data)
+
+      if (
+        data.ok &&
+        data.status === 'processed' &&
+        data.payment
+      ) {
+        await onPaymentReady?.(data.payment)
+      }
     } catch (error) {
       setResult({
         ok: false,
@@ -95,7 +82,6 @@ export function RazorpayIntegrationPanel() {
       setLoading(false)
     }
   }
-
   const processed = result?.status === 'processed'
   const approval = result?.policy?.requiresApproval
   const blocked = result?.policy?.blocked
@@ -203,7 +189,7 @@ export function RazorpayIntegrationPanel() {
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <ResultItem
                   label="Payment"
-                  value={result.paymentId ?? '—'}
+                  value={result.paymentId ?? 'â€”'}
                 />
 
                 <ResultItem

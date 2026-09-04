@@ -3,7 +3,7 @@
  * ---------------------------------------------------------------------
  * This is the integration seam between RecoverAI and a real payment
  * processor. Today only a synthetic, in-memory implementation exists
- * (`SyntheticPaymentProvider`) — no real payment API, no real money
+ * (`SyntheticPaymentProvider`) â€” no real payment API, no real money
  * movement, and no credentials are involved anywhere in this file.
  *
  * When a real integration is ready, implement `PaymentProvider` against
@@ -16,7 +16,7 @@ import type { Payment, RecoveryOutcome } from '@/types'
 import { demoPayments, demoRecoveryOutcomes, demoCustomers } from '@/data/demo'
 import { notifyRuntimeChange } from '@/lib/runtime-events'
 
-export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER — SYNTHETIC'
+export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER â€” SYNTHETIC'
 
 /** Original payment rows captured before a session mutation, keyed by payment id. */
 const paymentSnapshots = new Map<string, Payment>()
@@ -43,11 +43,25 @@ export interface PaymentProvider {
 }
 
 /**
- * SyntheticPaymentProvider — DEMO PROVIDER — SYNTHETIC.
+ * SyntheticPaymentProvider â€” DEMO PROVIDER â€” SYNTHETIC.
  * Operates entirely on the in-memory demo dataset. Mutations are held
  * in-process only and reset on reload; nothing here talks to a network,
  * a database, or a real payment processor.
  */
+export function registerSyntheticPayment(payment: Payment): Payment {
+  const existingIndex = demoPayments.findIndex((p) => p.id === payment.id)
+
+  if (existingIndex >= 0) {
+    demoPayments[existingIndex] = payment
+  } else {
+    demoPayments.unshift(payment)
+  }
+
+  notifyRuntimeChange('payment-updated', payment.id)
+
+  return payment
+}
+
 export class SyntheticPaymentProvider implements PaymentProvider {
   readonly label = DEMO_PROVIDER_LABEL
 
@@ -67,19 +81,19 @@ export class SyntheticPaymentProvider implements PaymentProvider {
     if (payment.status === 'recovered') {
       return {
         ok: true,
-        message: `Payment ${paymentId} is already recovered — no synthetic retry was attempted.`,
+        message: `Payment ${paymentId} is already recovered â€” no synthetic retry was attempted.`,
       }
     }
     if (payment.status === 'blocked') {
       return {
         ok: false,
-        message: `Payment ${paymentId} is blocked — synthetic retries are not permitted.`,
+        message: `Payment ${paymentId} is blocked â€” synthetic retries are not permitted.`,
       }
     }
     if (payment.status === 'pending-approval') {
       return {
         ok: false,
-        message: `Payment ${paymentId} is awaiting human approval — synthetic retry was not executed.`,
+        message: `Payment ${paymentId} is awaiting human approval â€” synthetic retry was not executed.`,
       }
     }
 
@@ -93,7 +107,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
       notifyRuntimeChange('payment-updated', paymentId)
       return {
         ok: true,
-        message: `Synthetic retry succeeded for ${paymentId} — in-memory status set to recovered. No real charge was attempted.`,
+        message: `Synthetic retry succeeded for ${paymentId} â€” in-memory status set to recovered. No real charge was attempted.`,
       }
     }
 
@@ -101,7 +115,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
     notifyRuntimeChange('payment-updated', paymentId)
     return {
       ok: false,
-      message: `Synthetic retry did not recover ${paymentId} — in-memory status set to failed. No real charge was attempted.`,
+      message: `Synthetic retry did not recover ${paymentId} â€” in-memory status set to failed. No real charge was attempted.`,
     }
   }
 
@@ -119,7 +133,7 @@ export class SyntheticPaymentProvider implements PaymentProvider {
 
 /**
  * Restore a payment (and session-appended outcomes for it) to the demo seed.
- * Session-only — nothing is written to disk.
+ * Session-only â€” nothing is written to disk.
  */
 export async function resetSyntheticSimulation(paymentId: string): Promise<void> {
   const original = paymentSnapshots.get(paymentId)

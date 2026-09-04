@@ -64,6 +64,7 @@ import {
 } from '@/services/agent-service'
 
 import { computeLiveMetrics } from '@/services/analytics-service'
+import { registerSyntheticPayment } from '@/lib/providers/payment-provider'
 import { RECOVERY_ACTION_LABELS } from '@/types'
 
 import type {
@@ -350,9 +351,11 @@ export function AgentCommandCenter({
   initialAgentState,
   metrics,
 }: AgentCommandCenterProps) {
+  const [availablePayments, setAvailablePayments] =
+    useState<Payment[]>(simulationPayments)
   const defaultPaymentId =
-    simulationPayments.find((p) => p.id === 'P10982')?.id ??
-    simulationPayments[0]?.id ??
+    availablePayments.find((p) => p.id === 'P10982')?.id ??
+    availablePayments[0]?.id ??
     'P10982'
 
   const [selectedPaymentId, setSelectedPaymentId] = useState(defaultPaymentId)
@@ -404,8 +407,8 @@ export function AgentCommandCenter({
 
   const selectedPayment =
     latestOf(snapshots, (s) => (s.paymentId === selectedPaymentId ? s.payment : undefined)) ??
-    simulationPayments.find((p) => p.id === selectedPaymentId) ??
-    simulationPayments[0]
+    availablePayments.find((p) => p.id === selectedPaymentId) ??
+    availablePayments[0]
 
   const featuredDecision =
     latestOf(snapshots, (s) => s.decision) ??
@@ -635,6 +638,77 @@ export function AgentCommandCenter({
     await clearRun(selectedRef.current)
   }
 
+  async function handleRazorpayPaymentReady(payment: Payment) {
+    playingRef.current = false
+    runIdRef.current += 1
+
+    await clearRun(selectedRef.current)
+
+    registerSyntheticPayment(payment)
+
+    setAvailablePayments((prev) => [
+      payment,
+      ...prev.filter((item) => item.id !== payment.id),
+    ])
+
+    selectedRef.current = payment.id
+    setSelectedPaymentId(payment.id)
+
+    setApprovalStatus(
+      approvals.find(
+        (approval) => approval.paymentId === payment.id,
+      )?.status ?? 'pending',
+    )
+
+    setDemoError(null)
+
+    const runId = ++runIdRef.current
+    playingRef.current = true
+    setPlayback('playing')
+    setBusy(true)
+
+    try {
+      let result: 'continue' | 'waiting' | 'done' = 'continue'
+
+      while (
+        playingRef.current &&
+        executedRef.current < AGENT_PIPELINE.length &&
+        runIdRef.current === runId
+      ) {
+        result = await executeNextStage()
+
+        if (
+          result !== 'continue' ||
+          !playingRef.current ||
+          runIdRef.current !== runId
+        ) {
+          break
+        }
+
+        await wait(STAGE_DELAY_MS)
+      }
+
+      if (runIdRef.current === runId) {
+        playingRef.current = false
+        setPlayback(result === 'done' ? 'done' : 'paused')
+      }
+    } catch (err) {
+      if (runIdRef.current === runId) {
+        playingRef.current = false
+        setDemoError(
+          err instanceof Error
+            ? err.message
+            : String(err),
+        )
+        setPlayback('paused')
+      }
+    } finally {
+      if (runIdRef.current === runId) {
+        setBusy(false)
+      }
+    }
+  }
+
   async function handleSelectPayment(paymentId: string) {
     if (
       paymentId === selectedRef.current &&
@@ -737,7 +811,6 @@ export function AgentCommandCenter({
   return (
     <div className="flex flex-col gap-6">
       {/* AGENT STATUS HERO CARD */}
-      <RazorpayIntegrationPanel />
       <Card className="relative overflow-hidden border-ai/20">
         <div className="pointer-events-none absolute -top-20 -right-20 size-64 rounded-full bg-ai-muted/30 blur-3xl" />
 
@@ -831,7 +904,7 @@ export function AgentCommandCenter({
                 Demo scenario
               </span>
 
-              {simulationPayments.map((payment) => (
+              {availablePayments.map((payment) => (
                 <Button
                   key={payment.id}
                   type="button"
@@ -977,7 +1050,7 @@ export function AgentCommandCenter({
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-muted/30 px-3 py-2.5">
                 <ShieldOff className="size-4 shrink-0 text-danger" />
                 <span className="text-sm font-medium text-danger">
-                  Approval rejected — recovery halted.
+                  Approval rejected â€” recovery halted.
                 </span>
                 <span className="text-xs text-muted-foreground">
                   No retry was executed. Rejection recorded in the audit trail.
@@ -989,13 +1062,17 @@ export function AgentCommandCenter({
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/25 bg-success-muted/30 px-3 py-2.5">
                 <ShieldCheck className="size-4 shrink-0 text-success" />
                 <span className="text-sm font-medium text-success">
-                  Approval granted — resuming recovery.
+                  Approval granted â€” resuming recovery.
                 </span>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      <RazorpayIntegrationPanel
+  onPaymentReady={handleRazorpayPaymentReady}
+/>
 
       {/* JUDGE DEMO COMPLETION SUMMARY */}
       {finished && !demoError && (
@@ -1016,26 +1093,26 @@ export function AgentCommandCenter({
               )}
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 {policyEvaluation?.blocked
-                  ? 'RECOVERY DEMO COMPLETE — BLOCKED'
+                  ? 'RECOVERY DEMO COMPLETE â€” BLOCKED'
                   : approvalStatus === 'rejected'
-                    ? 'RECOVERY DEMO COMPLETE — REJECTED'
+                    ? 'RECOVERY DEMO COMPLETE â€” REJECTED'
                     : 'RECOVERY DEMO COMPLETE'}
               </h3>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <SummaryRow label="Payment" value={selectedPayment?.id ?? '—'} mono />
-              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? '—'} />
+              <SummaryRow label="Payment" value={selectedPayment?.id ?? 'â€”'} mono />
+              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? 'â€”'} />
               <SummaryRow
                 label="Amount"
-                value={selectedPayment ? formatCurrency(selectedPayment.amount) : '—'}
+                value={selectedPayment ? formatCurrency(selectedPayment.amount) : 'â€”'}
               />
               <SummaryRow
                 label="AI Decision"
                 value={
                   featuredDecision
                     ? RECOVERY_ACTION_LABELS[featuredDecision.recommendedAction]
-                    : '—'
+                    : 'â€”'
                 }
               />
               <SummaryRow
@@ -1043,7 +1120,7 @@ export function AgentCommandCenter({
                 value={
                   featuredPrediction
                     ? formatPercent(featuredPrediction.recoveryProbability)
-                    : '—'
+                    : 'â€”'
                 }
               />
               <SummaryRow
@@ -1051,7 +1128,7 @@ export function AgentCommandCenter({
                 value={
                   featuredPrediction
                     ? formatPercent(featuredPrediction.confidence)
-                    : '—'
+                    : 'â€”'
                 }
               />
               <SummaryRow
@@ -1073,7 +1150,7 @@ export function AgentCommandCenter({
                       : policyEvaluation.requiresApproval
                         ? `Approval required · ${policyEvaluation.policyId}`
                         : `Allowed · ${policyEvaluation.policyId}`
-                    : '—'
+                    : 'â€”'
                 }
                 tone={
                   policyEvaluation?.blocked
@@ -1094,7 +1171,7 @@ export function AgentCommandCenter({
                         : verifyResult.status.replace('-', ' ')
                     : policyEvaluation?.blocked
                       ? 'Not executed'
-                      : '—'
+                      : 'â€”'
                 }
                 tone={
                   verifyResult?.status === 'recovered'
@@ -1106,7 +1183,7 @@ export function AgentCommandCenter({
               />
               <SummaryRow
                 label="Verification"
-                value={verifyResult ? verifyResult.message : '—'}
+                value={verifyResult ? verifyResult.message : 'â€”'}
               />
               <SummaryRow
                 label="Audit"
@@ -1124,7 +1201,7 @@ export function AgentCommandCenter({
 
             {approvalStatus === 'rejected' && approvalResolved && (
               <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
-                <span className="font-medium text-danger">Approval rejected — </span>
+                <span className="font-medium text-danger">Approval rejected â€” </span>
                 <span className="text-muted-foreground">
                   recovery halted and recorded in the audit trail.
                 </span>
@@ -1168,7 +1245,7 @@ export function AgentCommandCenter({
                   <Tooltip
                     content={
                       stopped
-                        ? 'Stopped — recovery was blocked by policy'
+                        ? 'Stopped â€” recovery was blocked by policy'
                         : stage.description
                     }
                     side="bottom"
@@ -1451,7 +1528,7 @@ export function AgentCommandCenter({
                       ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
                       : `Fallback${
                           featuredDecision.aiRecommendation.fallbackReason
-                            ? ` — ${featuredDecision.aiRecommendation.fallbackReason}`
+                            ? ` â€” ${featuredDecision.aiRecommendation.fallbackReason}`
                             : ''
                         }`}
                   </Badge>
@@ -1483,7 +1560,7 @@ export function AgentCommandCenter({
                           : 'text-danger',
                     )}
                   >
-                    {selectedPayment?.risk ?? '—'}
+                    {selectedPayment?.risk ?? 'â€”'}
                   </div>
                 </div>
 
@@ -1777,7 +1854,7 @@ export function AgentCommandCenter({
                     Risk Level
                   </div>
                   <div className="mt-0.5 text-sm font-semibold capitalize text-foreground">
-                    {selectedPayment?.risk ?? '—'}
+                    {selectedPayment?.risk ?? 'â€”'}
                   </div>
                 </div>
 

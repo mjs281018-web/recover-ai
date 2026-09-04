@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { verifyRazorpayWebhookSignature } from '@/lib/razorpay/webhook-verifier'
 import {
   mapRazorpayEventToPayment,
@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
       status: 'processed',
       eventId,
       paymentId: payment.id,
+      payment,
       policy: {
         verdict: evaluation.verdict,
         allowed: evaluation.allowed,

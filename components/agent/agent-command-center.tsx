@@ -661,52 +661,8 @@ export function AgentCommandCenter({
     )
 
     setDemoError(null)
-
-    const runId = ++runIdRef.current
-    playingRef.current = true
-    setPlayback('playing')
-    setBusy(true)
-
-    try {
-      let result: 'continue' | 'waiting' | 'done' = 'continue'
-
-      while (
-        playingRef.current &&
-        executedRef.current < AGENT_PIPELINE.length &&
-        runIdRef.current === runId
-      ) {
-        result = await executeNextStage()
-
-        if (
-          result !== 'continue' ||
-          !playingRef.current ||
-          runIdRef.current !== runId
-        ) {
-          break
-        }
-
-        await wait(STAGE_DELAY_MS)
-      }
-
-      if (runIdRef.current === runId) {
-        playingRef.current = false
-        setPlayback(result === 'done' ? 'done' : 'paused')
-      }
-    } catch (err) {
-      if (runIdRef.current === runId) {
-        playingRef.current = false
-        setDemoError(
-          err instanceof Error
-            ? err.message
-            : String(err),
-        )
-        setPlayback('paused')
-      }
-    } finally {
-      if (runIdRef.current === runId) {
-        setBusy(false)
-      }
-    }
+    setPlayback('idle')
+    setBusy(false)
   }
 
   async function handleSelectPayment(paymentId: string) {
@@ -2244,3 +2200,4 @@ function SummaryRow({
     </div>
   )
 }
+

@@ -182,7 +182,9 @@ export async function simulateBatchRecovery(
   const escalatedPayments = isHighValueReview
     ? Math.max(
         1,
-        Math.round(paymentsProcessed * 0.18),
+        Math.round(
+          paymentsProcessed * 0.18,
+        ),
       )
     : Math.round(
         paymentsProcessed * 0.04,
@@ -209,7 +211,8 @@ export async function simulateBatchRecovery(
 
   const failedPayments = Math.max(
     0,
-    recoveryAttempts - recoveredPayments,
+    recoveryAttempts -
+      recoveredPayments,
   )
 
   /*
@@ -227,13 +230,17 @@ export async function simulateBatchRecovery(
   /*
    * Calculate simulated recovery amount.
    */
-  const simulatedRecoveredAmount = Math.round(
-    batch.totalAmount *
-      Math.min(
-        0.92,
-        recoveredPayments / paymentsProcessed,
-      ),
-  )
+  const simulatedRecoveredAmount =
+    paymentsProcessed === 0
+      ? 0
+      : Math.round(
+          batch.totalAmount *
+            Math.min(
+              0.92,
+              recoveredPayments /
+                paymentsProcessed,
+            ),
+        )
 
   /*
    * Full 8-stage RecoverAI batch pipeline.
@@ -382,6 +389,18 @@ export async function simulateBatchRecovery(
 
   // -------------------------------------------------------------------------
   // Record audit event.
+  //
+  // IMPORTANT:
+  // Use recoveredPayments here instead of recoverCount.
+  //
+  // recoveredPayments represents the deterministic batch simulation result
+  // shown to the user (for example, 50 successful recoveries for the Card
+  // channel fallback batch). recoverCount only represents how many additional
+  // synthetic payment records were changed during this particular run.
+  //
+  // This prevents repeated simulations from producing misleading audit
+  // messages such as "0 payments recovered" while the campaign itself still
+  // reports its measured recovery result.
   // -------------------------------------------------------------------------
 
   await recordAuditEvent({
@@ -389,7 +408,7 @@ export async function simulateBatchRecovery(
     actor: 'system',
     action:
       `Batch ${batch.name} completed — ` +
-      `${recoverCount} payments recovered, ` +
+      `${recoveredPayments} payments recovered, ` +
       `${escalatedPayments} escalated, ` +
       `${stoppedPayments} stopped.`,
     target: batch.id,
@@ -418,7 +437,8 @@ export async function simulateBatchRecovery(
     escalatedPayments,
     stoppedPayments,
 
-    totalAmount: batch.totalAmount,
+    totalAmount:
+      batch.totalAmount,
 
     recoveredAmount:
       finalRecoveredAmount,

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import {
@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Payment } from '@/types'
+
+type Scenario = 'standard' | 'high-value' | 'fraud-critical'
 
 type RazorpayResult = {
   ok: boolean
@@ -46,6 +48,7 @@ export function RazorpayIntegrationPanel({
 }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<RazorpayResult | null>(null)
+  const [scenario, setScenario] = useState<Scenario>('standard')
 
   async function simulateWebhook() {
     setLoading(true)
@@ -56,6 +59,12 @@ export function RazorpayIntegrationPanel({
         '/api/webhooks/razorpay/simulate',
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            scenario,
+          }),
         },
       )
 
@@ -82,6 +91,7 @@ export function RazorpayIntegrationPanel({
       setLoading(false)
     }
   }
+
   const processed = result?.status === 'processed'
   const approval = result?.policy?.requiresApproval
   const blocked = result?.policy?.blocked
@@ -126,7 +136,7 @@ export function RazorpayIntegrationPanel({
         </div>
 
         <div className="rounded-xl border border-border bg-surface/40 p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold text-foreground">
                 Razorpay Failure Simulation
@@ -138,6 +148,37 @@ export function RazorpayIntegrationPanel({
             </div>
 
             <Badge variant="neutral">No real money movement</Badge>
+          </div>
+
+          <div className="mb-4">
+            <label
+              htmlFor="razorpay-scenario"
+              className="mb-2 block text-xs font-medium text-muted-foreground"
+            >
+              Demo Scenario
+            </label>
+
+            <select
+              id="razorpay-scenario"
+              value={scenario}
+              onChange={(event) =>
+                setScenario(event.target.value as Scenario)
+              }
+              disabled={loading}
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary sm:max-w-md"
+            >
+              <option value="standard">
+                Standard — ?499 — Allowed
+              </option>
+
+              <option value="high-value">
+                High Value — ?18,500 — Human Approval
+              </option>
+
+              <option value="fraud-critical">
+                Fraud Critical — ?3,150 — Blocked
+              </option>
+            </select>
           </div>
 
           <Button
@@ -280,4 +321,3 @@ function ResultItem({
     </div>
   )
 }
-

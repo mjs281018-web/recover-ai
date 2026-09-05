@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+﻿import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 type Scenario = 'standard' | 'high-value' | 'fraud-critical'
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
   }[scenario]
 
   const eventId = `evt_demo_${Date.now()}`
+  const paymentEntityId = `pay_demo_${Date.now()}`
 
   const payload = {
     entity: 'event',
@@ -68,19 +69,19 @@ export async function POST(req: NextRequest) {
     payload: {
       payment: {
         entity: {
-          id: `pay_demo_${Date.now()}`,
-          amount: scenario.amount,
+          id: paymentEntityId,
+          amount: scenarios.amount,
           currency: 'INR',
           status: 'failed',
           method: 'card',
-          email: scenario.email,
-          contact: scenario.contact,
+          email: scenarios.email,
+          contact: scenarios.contact,
           description: 'RecoverAI Demo Payment',
-          order_id: scenario.orderId,
-          error_code: scenario.errorCode,
-          error_description: scenario.errorDescription,
+          order_id: scenarios.orderId,
+          error_code: scenarios.errorCode,
+          error_description: scenarios.errorDescription,
           notes: {
-            customer_name: scenario.customerName,
+            customer_name: scenarios.customerName,
           },
           created_at: Math.floor(Date.now() / 1000),
         },

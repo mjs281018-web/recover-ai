@@ -11,7 +11,12 @@ import {
   IndianRupee,
 } from 'lucide-react'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -47,8 +52,10 @@ export function RazorpayIntegrationPanel({
   ) => void | Promise<void>
 }) {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<RazorpayResult | null>(null)
-  const [scenario, setScenario] = useState<Scenario>('standard')
+  const [result, setResult] =
+    useState<RazorpayResult | null>(null)
+  const [scenario, setScenario] =
+    useState<Scenario>('standard')
 
   async function simulateWebhook() {
     setLoading(true)
@@ -68,17 +75,49 @@ export function RazorpayIntegrationPanel({
         },
       )
 
-      const data = (await response.json()) as RazorpayResult
-
-      setResult(data)
+      const data =
+        (await response.json()) as RazorpayResult
 
       if (
         data.ok &&
         data.status === 'processed' &&
         data.payment
       ) {
-        await onPaymentReady?.(data.payment)
+        const rawAmount = data.payment.amount
+
+        if (
+          rawAmount === null ||
+          rawAmount === undefined ||
+          Number.isNaN(Number(rawAmount))
+        ) {
+          setResult({
+            ...data,
+            ok: false,
+            error:
+              'Razorpay payment amount is missing or invalid',
+          })
+
+          return
+        }
+
+        const normalizedPayment: Payment = {
+          ...data.payment,
+          amount: Number(rawAmount),
+        }
+
+        const normalizedResult: RazorpayResult = {
+          ...data,
+          payment: normalizedPayment,
+        }
+
+        setResult(normalizedResult)
+
+        await onPaymentReady?.(normalizedPayment)
+
+        return
       }
+
+      setResult(data)
     } catch (error) {
       setResult({
         ok: false,
@@ -101,8 +140,13 @@ export function RazorpayIntegrationPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Webhook className="size-4 text-primary" />
+
           Razorpay Integration
-          <Badge variant="success" className="ml-auto">
+
+          <Badge
+            variant="success"
+            className="ml-auto"
+          >
             Demo Connected
           </Badge>
         </CardTitle>
@@ -143,11 +187,14 @@ export function RazorpayIntegrationPanel({
               </div>
 
               <div className="mt-1 text-xs text-muted-foreground">
-                Sends a signed demo payment.failed webhook to RecoverAI.
+                Sends a signed demo payment.failed
+                webhook to RecoverAI.
               </div>
             </div>
 
-            <Badge variant="neutral">No real money movement</Badge>
+            <Badge variant="neutral">
+              No real money movement
+            </Badge>
           </div>
 
           <div className="mb-4">
@@ -162,21 +209,23 @@ export function RazorpayIntegrationPanel({
               id="razorpay-scenario"
               value={scenario}
               onChange={(event) =>
-                setScenario(event.target.value as Scenario)
+                setScenario(
+                  event.target.value as Scenario,
+                )
               }
               disabled={loading}
               className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary sm:max-w-md"
             >
               <option value="standard">
-                Standard — ?499 — Allowed
+                Standard — ₹499 — Allowed
               </option>
 
               <option value="high-value">
-                High Value — ?18,500 — Human Approval
+                High Value — ₹18,500 — Human Approval
               </option>
 
               <option value="fraud-critical">
-                Fraud Critical — ?3,150 — Blocked
+                Fraud Critical — ₹3,150 — Blocked
               </option>
             </select>
           </div>
@@ -222,15 +271,27 @@ export function RazorpayIntegrationPanel({
                   ? 'Razorpay Webhook Processed'
                   : result.status === 'ignored'
                     ? 'Webhook Ignored'
-                    : result.error ?? 'Webhook Failed'}
+                    : result.error ??
+                      'Webhook Failed'}
               </span>
             </div>
 
             {processed && result.policy && (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <ResultItem
                   label="Payment"
                   value={result.paymentId ?? '—'}
+                />
+
+                <ResultItem
+                  label="Amount"
+                  value={
+                    result.payment?.amount != null
+                      ? `₹${Number(
+                          result.payment.amount,
+                        ).toLocaleString('en-IN')}`
+                      : '—'
+                  }
                 />
 
                 <ResultItem
@@ -256,14 +317,15 @@ export function RazorpayIntegrationPanel({
               </div>
             )}
 
-            {processed && result.policy?.reason && (
-              <div className="mt-3 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  Policy reason:
-                </span>{' '}
-                {result.policy.reason}
-              </div>
-            )}
+            {processed &&
+              result.policy?.reason && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    Policy reason:
+                  </span>{' '}
+                  {result.policy.reason}
+                </div>
+              )}
 
             {result.reason && (
               <div className="mt-2 text-xs text-muted-foreground">
@@ -282,7 +344,9 @@ function StatusItem({
   label,
   value,
 }: {
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{
+    className?: string
+  }>
   label: string
   value: string
 }) {
@@ -290,6 +354,7 @@ function StatusItem({
     <div className="rounded-lg border border-border bg-surface/40 p-3">
       <div className="flex items-center gap-1.5">
         <Icon className="size-3.5 text-success" />
+
         <span className="text-[10px] font-medium uppercase text-muted-foreground">
           {label}
         </span>

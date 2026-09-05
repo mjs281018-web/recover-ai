@@ -401,9 +401,17 @@ export function AgentCommandCenter({
   const snapshotsRef = useRef<RecoveryStageSnapshot[]>([])
   const sessionStartedRef = useRef(false)
 
-  const selectedApproval = approvals.find(
-    (approval) => approval.paymentId === selectedPaymentId,
-  )
+  const selectedApproval =
+    approvals.find(
+      (approval) => approval.paymentId === selectedPaymentId,
+    ) ??
+    latestOf(
+      snapshots,
+      (snapshot) =>
+        snapshot.paymentId === selectedPaymentId
+          ? snapshot.approval
+          : undefined,
+    )
 
   const selectedPayment =
     availablePayments.find((p) => p.id === selectedPaymentId) ??
@@ -482,7 +490,9 @@ export function AgentCommandCenter({
     policyEvaluation,
   )
 
-  const mode = modeLabel(liveAgentState)
+  const mode = policyEvaluation?.blocked
+    ? { value: 'Blocked', tone: 'danger' as const }
+    : modeLabel(liveAgentState)
 
   async function executeNextStage(): Promise<'continue' | 'waiting' | 'done'> {
     const index = executedRef.current

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import {
@@ -189,7 +189,7 @@ export function RazorpayIntegrationPanel({
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <ResultItem
                   label="Payment"
-                  value={result.paymentId ?? 'â€”'}
+                  value={result.paymentId ?? '—'}
                 />
 
                 <ResultItem

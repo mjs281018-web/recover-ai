@@ -942,13 +942,13 @@ export function AgentCommandCenter({
                     <span className="font-medium text-foreground">
                       {selectedPayment.id}
                     </span>{' '}
-                    Â· {selectedPayment.customerName} Â·{' '}
+                    · {selectedPayment.customerName} ·{' '}
                     {formatCurrency(selectedPayment.amount)}
                   </span>
                   <span className="capitalize">
                     Status: {selectedPayment.status.replace('-', ' ')}
-                    {' Â· '}Channel: {selectedPayment.channel}
-                    {' Â· '}Risk: {selectedPayment.risk}
+                    {' · '}Channel: {selectedPayment.channel}
+                    {' · '}Risk: {selectedPayment.risk}
                   </span>
                 </div>
               )}
@@ -971,7 +971,7 @@ export function AgentCommandCenter({
                 <ShieldAlert className="size-4 shrink-0 text-warning" />
                 <span className="text-sm font-medium text-warning">
                   Awaiting human approval
-                  {selectedApproval ? ` Â· ${selectedApproval.id}` : ''}
+                  {selectedApproval ? ` · ${selectedApproval.id}` : ''}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {selectedApproval?.reason}
@@ -1006,7 +1006,7 @@ export function AgentCommandCenter({
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-muted/30 px-3 py-2.5">
                 <ShieldOff className="size-4 shrink-0 text-danger" />
                 <span className="text-sm font-medium text-danger">
-                  Approval rejected Ã¢â‚¬â€ recovery halted.
+                  Approval rejected — recovery halted.
                 </span>
                 <span className="text-xs text-muted-foreground">
                   No retry was executed. Rejection recorded in the audit trail.
@@ -1027,8 +1027,8 @@ export function AgentCommandCenter({
       </Card>
 
       <RazorpayIntegrationPanel
-  onPaymentReady={handleRazorpayPaymentReady}
-/>
+        onPaymentReady={handleRazorpayPaymentReady}
+      />
 
       {/* JUDGE DEMO COMPLETION SUMMARY */}
       {finished && !demoError && (
@@ -1048,27 +1048,23 @@ export function AgentCommandCenter({
                 <CircleCheckBig className="size-5 text-success" />
               )}
               <h3 className="text-base font-semibold tracking-tight text-foreground">
-                {policyEvaluation?.blocked
-                  ? 'RECOVERY DEMO COMPLETE Ã¢â‚¬â€ BLOCKED'
-                  : approvalStatus === 'rejected'
-                    ? 'RECOVERY DEMO COMPLETE Ã¢â‚¬â€ REJECTED'
-                    : 'RECOVERY DEMO COMPLETE'}
+                RECOVERY DEMO COMPLETE
               </h3>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <SummaryRow label="Payment" value={selectedPayment?.id ?? 'Ã¢â‚¬â€'} mono />
-              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? 'Ã¢â‚¬â€'} />
+              <SummaryRow label="Payment" value={selectedPayment?.id ?? '—'} />
+              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? '—'} />
               <SummaryRow
                 label="Amount"
-                value={selectedPayment ? formatCurrency(selectedPayment.amount) : 'Ã¢â‚¬â€'}
+                value={selectedPayment ? formatCurrency(selectedPayment.amount) : '—'}
               />
               <SummaryRow
                 label="AI Decision"
                 value={
                   featuredDecision
                     ? RECOVERY_ACTION_LABELS[featuredDecision.recommendedAction]
-                    : 'Ã¢â‚¬â€'
+                    : '—'
                 }
               />
               <SummaryRow
@@ -1076,7 +1072,7 @@ export function AgentCommandCenter({
                 value={
                   featuredPrediction
                     ? formatPercent(featuredPrediction.recoveryProbability)
-                    : 'Ã¢â‚¬â€'
+                    : '—'
                 }
               />
               <SummaryRow
@@ -1084,7 +1080,7 @@ export function AgentCommandCenter({
                 value={
                   featuredPrediction
                     ? formatPercent(featuredPrediction.confidence)
-                    : 'Ã¢â‚¬â€'
+                    : '—'
                 }
               />
               <SummaryRow
@@ -1093,8 +1089,8 @@ export function AgentCommandCenter({
                   featuredDecision?.aiRecommendation?.source === 'ai-llm' &&
                   featuredDecision.aiRecommendation.provider &&
                   featuredDecision.aiRecommendation.model
-                    ? `AI Â· ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
-                    : 'Deterministic AI fallback Â· rule-based'
+                    ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
+                    : 'Deterministic AI fallback · rule-based'
                 }
               />
               <SummaryRow
@@ -1102,11 +1098,11 @@ export function AgentCommandCenter({
                 value={
                   policyEvaluation
                     ? policyEvaluation.blocked
-                      ? `Blocked Â· ${policyEvaluation.policyId}`
+                      ? `Blocked · ${policyEvaluation.policyId}`
                       : policyEvaluation.requiresApproval
-                        ? `Approval required Â· ${policyEvaluation.policyId}`
-                        : `Allowed Â· ${policyEvaluation.policyId}`
-                    : 'Ã¢â‚¬â€'
+                        ? `Approval required · ${policyEvaluation.policyId}`
+                        : `Allowed · ${policyEvaluation.policyId}`
+                    : '—'
                 }
                 tone={
                   policyEvaluation?.blocked
@@ -1127,7 +1123,7 @@ export function AgentCommandCenter({
                         : verifyResult.status.replace('-', ' ')
                     : policyEvaluation?.blocked
                       ? 'Not executed'
-                      : 'Ã¢â‚¬â€'
+                      : '—'
                 }
                 tone={
                   verifyResult?.status === 'recovered'
@@ -1139,11 +1135,11 @@ export function AgentCommandCenter({
               />
               <SummaryRow
                 label="Verification"
-                value={verifyResult ? verifyResult.message : 'Ã¢â‚¬â€'}
+                value={verifyResult ? verifyResult.message : '—'}
               />
               <SummaryRow
                 label="Audit"
-                value={auditEvent ? `Recorded Â· ${auditEvent.id}` : 'Recorded'}
+                value={auditEvent ? `Recorded · ${auditEvent.id}` : 'Recorded'}
                 tone="success"
               />
             </div>
@@ -1157,9 +1153,9 @@ export function AgentCommandCenter({
 
             {approvalStatus === 'rejected' && approvalResolved && (
               <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
-                <span className="font-medium text-danger">Approval rejected Ã¢â‚¬â€ </span>
+                <span className="font-medium text-danger">Approval rejected — recovery halted. </span>
                 <span className="text-muted-foreground">
-                  recovery halted and recorded in the audit trail.
+                  Recovery halted and recorded in the audit trail.
                 </span>
               </div>
             )}
@@ -1201,7 +1197,7 @@ export function AgentCommandCenter({
                   <Tooltip
                     content={
                       stopped
-                        ? 'Stopped Ã¢â‚¬â€ recovery was blocked by policy'
+                        ? 'Stopped — recovery was blocked by policy'
                         : stage.description
                     }
                     side="bottom"
@@ -1481,10 +1477,10 @@ export function AgentCommandCenter({
                     className="shrink-0"
                   >
                     {featuredDecision.aiRecommendation.source === 'ai-llm'
-                      ? `AI Â· ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
+                      ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
                       : `Fallback${
                           featuredDecision.aiRecommendation.fallbackReason
-                            ? ` Ã¢â‚¬â€ ${featuredDecision.aiRecommendation.fallbackReason}`
+                            ? ` — ${featuredDecision.aiRecommendation.fallbackReason}`
                             : ''
                         }`}
                   </Badge>
@@ -1516,7 +1512,7 @@ export function AgentCommandCenter({
                           : 'text-danger',
                     )}
                   >
-                    {selectedPayment?.risk ?? 'Ã¢â‚¬â€'}
+                    {selectedPayment?.risk ?? '—'}
                   </div>
                 </div>
 
@@ -1739,7 +1735,7 @@ export function AgentCommandCenter({
                         Audit
                       </div>
                       <div className="mt-0.5 text-muted-foreground">
-                        {auditEvent.action} Â· {auditEvent.timestamp}
+                        {auditEvent.action} · {auditEvent.timestamp}
                       </div>
                     </div>
                   )}
@@ -1810,7 +1806,7 @@ export function AgentCommandCenter({
                     Risk Level
                   </div>
                   <div className="mt-0.5 text-sm font-semibold capitalize text-foreground">
-                    {selectedPayment?.risk ?? 'Ã¢â‚¬â€'}
+                    {selectedPayment?.risk ?? '—'}
                   </div>
                 </div>
 
@@ -2133,7 +2129,7 @@ function StageExtras({
           <span className="font-medium text-foreground">
             {evaluation.policyId}
           </span>{' '}
-          Â· {evaluation.verdict}
+          · {evaluation.verdict}
         </span>
       )}
 
@@ -2200,5 +2196,3 @@ function SummaryRow({
     </div>
   )
 }
-
-

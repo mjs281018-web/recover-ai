@@ -1,55 +1,132 @@
+
 /**
  * Payment provider abstraction.
  * ---------------------------------------------------------------------
- * This is the integration seam between RecoverAI and a real payment
- * processor. Today only a synthetic, in-memory implementation exists
- * (`SyntheticPaymentProvider`) â€” no real payment API, no real money
- * movement, and no credentials are involved anywhere in this file.
- *
- * When a real integration is ready, implement `PaymentProvider` against
- * the target processor (Razorpay, Stripe, a payment gateway aggregator,
- * etc.) and swap it in via `getPaymentProvider()` without touching the
- * services or UI layers that depend on this interface.
+ * RecoverAI currently uses a synthetic, in-memory payment provider.
+ * No real payment API, credentials, or money movement are used here.
  */
 
 import type { Payment, RecoveryOutcome } from '@/types'
-import { demoPayments, demoRecoveryOutcomes, demoCustomers } from '@/data/demo'
+import {
+  demoPayments,
+  demoRecoveryOutcomes,
+  demoCustomers,
+} from '@/data/demo'
 import { notifyRuntimeChange } from '@/lib/runtime-events'
 
-export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER â€” SYNTHETIC'
+export const DEMO_PROVIDER_LABEL = 'DEMO PROVIDER — SYNTHETIC'
 
-/** Original payment rows captured before a session mutation, keyed by payment id. */
+/**
+ * Stores the original state of payments before a session mutation.
+ * Used by resetSyntheticSimulation().
+ */
 const paymentSnapshots = new Map<string, Payment>()
-/** Outcome ids appended during this session so Reset can drop them. */
+
+/**
+ * Stores recovery outcome IDs created during the current session.
+ * Used by resetSyntheticSimulation().
+ */
 const sessionOutcomeIds = new Set<string>()
 
-function rememberPayment(payment: Payment) {
+/**
+ * Capture the original state of a payment before mutating it.
+ */
+function rememberPayment(payment: Payment): void {
   if (!paymentSnapshots.has(payment.id)) {
     paymentSnapshots.set(payment.id, { ...payment })
   }
 }
 
-export interface PaymentProvider {
-  /** Fetch a single payment by id. */
-  getPayment(paymentId: string): Promise<Payment | undefined>
-  /** Fetch every payment associated with a customer. */
-  getCustomerHistory(customerId: string): Promise<Payment[]>
-  /** Trigger a retry attempt for a payment. Synthetic providers simulate the result. */
-  retryPayment(paymentId: string): Promise<{ ok: boolean; message: string }>
-  /** Look up the current status of a payment. */
-  getPaymentStatus(paymentId: string): Promise<Payment['status'] | undefined>
-  /** Persist the outcome of a recovery attempt. */
-  recordRecoveryOutcome(outcome: RecoveryOutcome): Promise<RecoveryOutcome>
+/**
+ * Resume a payment after human approval.
+ *
+ * A payment in pending-approval state is moved back to at-risk so
+ * the existing recovery pipeline can execute it.
+ *
+ * This only changes the synthetic in-memory demo state.
+ * No real payment operation is performed.
+ */
+export function resumeSyntheticPayment(
+  paymentId: string,
+): Payment | undefined {
+  const payment = demoPayments.find(
+    (p) => p.id === paymentId,
+  )
+
+  if (!payment) {
+    return undefined
+  }
+
+  if (payment.status === 'pending-approval') {
+    rememberPayment(payment)
+
+    payment.status = 'at-risk'
+    payment.updatedAt = new Date().toISOString()
+
+    notifyRuntimeChange(
+      'payment-updated',
+      paymentId,
+    )
+  }
+
+  return payment
 }
 
 /**
- * SyntheticPaymentProvider â€” DEMO PROVIDER â€” SYNTHETIC.
- * Operates entirely on the in-memory demo dataset. Mutations are held
- * in-process only and reset on reload; nothing here talks to a network,
- * a database, or a real payment processor.
+ * Payment provider interface.
  */
-export function registerSyntheticPayment(payment: Payment): Payment {
-  const existingIndex = demoPayments.findIndex((p) => p.id === payment.id)
+export interface PaymentProvider {
+  /**
+   * Fetch a single payment by ID.
+   */
+  getPayment(
+    paymentId: string,
+  ): Promise<Payment | undefined>
+
+  /**
+   * Fetch payment history for a customer.
+   */
+  getCustomerHistory(
+    customerId: string,
+  ): Promise<Payment[]>
+
+  /**
+   * Execute a synthetic retry.
+   */
+  retryPayment(
+    paymentId: string,
+  ): Promise<{
+    ok: boolean
+    message: string
+  }>
+
+  /**
+   * Get the current payment status.
+   */
+  getPaymentStatus(
+    paymentId: string,
+  ): Promise<Payment['status'] | undefined>
+
+  /**
+   * Record a recovery outcome.
+   */
+  recordRecoveryOutcome(
+    outcome: RecoveryOutcome,
+  ): Promise<RecoveryOutcome>
+}
+
+/**
+ * Register a payment received from the demo Razorpay integration.
+ *
+ * This operates only on the browser-side synthetic demo dataset.
+ * It does not send anything to Razorpay.
+ */
+export function registerSyntheticPayment(
+  payment: Payment,
+): Payment {
+  const existingIndex = demoPayments.findIndex(
+    (p) => p.id === payment.id,
+  )
 
   if (existingIndex >= 0) {
     demoPayments[existingIndex] = payment
@@ -57,115 +134,233 @@ export function registerSyntheticPayment(payment: Payment): Payment {
     demoPayments.unshift(payment)
   }
 
-  notifyRuntimeChange('payment-updated', payment.id)
+  notifyRuntimeChange(
+    'payment-updated',
+    payment.id,
+  )
 
   return payment
 }
 
-export class SyntheticPaymentProvider implements PaymentProvider {
+/**
+ * Synthetic payment provider.
+ *
+ * All payment mutations are in-memory only.
+ * No real charge or retry is performed.
+ */
+export class SyntheticPaymentProvider
+  implements PaymentProvider
+{
   readonly label = DEMO_PROVIDER_LABEL
 
-  async getPayment(paymentId: string): Promise<Payment | undefined> {
-    return demoPayments.find((p) => p.id === paymentId)
+  async getPayment(
+    paymentId: string,
+  ): Promise<Payment | undefined> {
+    return demoPayments.find(
+      (p) => p.id === paymentId,
+    )
   }
 
-  async getCustomerHistory(customerId: string): Promise<Payment[]> {
-    return demoPayments.filter((p) => p.customerId === customerId)
+  async getCustomerHistory(
+    customerId: string,
+  ): Promise<Payment[]> {
+    return demoPayments.filter(
+      (p) => p.customerId === customerId,
+    )
   }
 
-  async retryPayment(paymentId: string): Promise<{ ok: boolean; message: string }> {
-    const payment = demoPayments.find((p) => p.id === paymentId)
+  async retryPayment(
+    paymentId: string,
+  ): Promise<{
+    ok: boolean
+    message: string
+  }> {
+    const payment = demoPayments.find(
+      (p) => p.id === paymentId,
+    )
+
     if (!payment) {
-      return { ok: false, message: `No synthetic payment found for ${paymentId}.` }
+      return {
+        ok: false,
+        message: `No synthetic payment found for ${paymentId}.`,
+      }
     }
+
     if (payment.status === 'recovered') {
       return {
         ok: true,
-        message: `Payment ${paymentId} is already recovered â€” no synthetic retry was attempted.`,
+        message: `Payment ${paymentId} is already recovered — no synthetic retry was attempted.`,
       }
     }
+
     if (payment.status === 'blocked') {
       return {
         ok: false,
-        message: `Payment ${paymentId} is blocked â€” synthetic retries are not permitted.`,
+        message: `Payment ${paymentId} is blocked — synthetic retries are not permitted.`,
       }
     }
+
     if (payment.status === 'pending-approval') {
       return {
         ok: false,
-        message: `Payment ${paymentId} is awaiting human approval â€” synthetic retry was not executed.`,
+        message: `Payment ${paymentId} is awaiting human approval — synthetic retry was not executed.`,
       }
     }
 
+    /**
+     * Capture the executable state before mutation.
+     * This allows Reset to restore the correct state.
+     */
     rememberPayment(payment)
+
     payment.attempts += 1
     payment.updatedAt = new Date().toISOString()
 
-    const ok = payment.recoveryProbability >= 0.5
+    /**
+     * Synthetic recovery rule:
+     * recoveryProbability >= 0.5 => success
+     * recoveryProbability < 0.5  => failure
+     */
+    const ok =
+      payment.recoveryProbability >= 0.5
+
     if (ok) {
       payment.status = 'recovered'
-      notifyRuntimeChange('payment-updated', paymentId)
+
+      notifyRuntimeChange(
+        'payment-updated',
+        paymentId,
+      )
+
       return {
         ok: true,
-        message: `Synthetic retry succeeded for ${paymentId} â€” in-memory status set to recovered. No real charge was attempted.`,
+        message:
+          `Synthetic retry succeeded for ${paymentId} — ` +
+          `in-memory status set to recovered. ` +
+          `No real charge was attempted.`,
       }
     }
 
     payment.status = 'failed'
-    notifyRuntimeChange('payment-updated', paymentId)
+
+    notifyRuntimeChange(
+      'payment-updated',
+      paymentId,
+    )
+
     return {
       ok: false,
-      message: `Synthetic retry did not recover ${paymentId} â€” in-memory status set to failed. No real charge was attempted.`,
+      message:
+        `Synthetic retry did not recover ${paymentId} — ` +
+        `in-memory status set to failed. ` +
+        `No real charge was attempted.`,
     }
   }
 
-  async getPaymentStatus(paymentId: string): Promise<Payment['status'] | undefined> {
-    return demoPayments.find((p) => p.id === paymentId)?.status
+  async getPaymentStatus(
+    paymentId: string,
+  ): Promise<Payment['status'] | undefined> {
+    return demoPayments.find(
+      (p) => p.id === paymentId,
+    )?.status
   }
 
-  async recordRecoveryOutcome(outcome: RecoveryOutcome): Promise<RecoveryOutcome> {
+  async recordRecoveryOutcome(
+    outcome: RecoveryOutcome,
+  ): Promise<RecoveryOutcome> {
     demoRecoveryOutcomes.push(outcome)
+
     sessionOutcomeIds.add(outcome.id)
-    notifyRuntimeChange('recovery-action', outcome.paymentId)
+
+    notifyRuntimeChange(
+      'recovery-action',
+      outcome.paymentId,
+    )
+
     return outcome
   }
 }
 
 /**
- * Restore a payment (and session-appended outcomes for it) to the demo seed.
- * Session-only â€” nothing is written to disk.
+ * Reset a synthetic payment and its session recovery outcomes
+ * back to the original demo state.
+ *
+ * Session-only operation.
+ * Nothing is written to disk or sent to a payment processor.
  */
-export async function resetSyntheticSimulation(paymentId: string): Promise<void> {
-  const original = paymentSnapshots.get(paymentId)
+export async function resetSyntheticSimulation(
+  paymentId: string,
+): Promise<void> {
+  const original =
+    paymentSnapshots.get(paymentId)
+
   if (original) {
-    const index = demoPayments.findIndex((p) => p.id === paymentId)
+    const index = demoPayments.findIndex(
+      (p) => p.id === paymentId,
+    )
+
     if (index >= 0) {
-      demoPayments[index] = { ...original }
+      demoPayments[index] = {
+        ...original,
+      }
     }
+
     paymentSnapshots.delete(paymentId)
   }
 
-  for (let i = demoRecoveryOutcomes.length - 1; i >= 0; i--) {
-    const outcome = demoRecoveryOutcomes[i]
-    if (sessionOutcomeIds.has(outcome.id) && outcome.paymentId === paymentId) {
+  for (
+    let i = demoRecoveryOutcomes.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const outcome =
+      demoRecoveryOutcomes[i]
+
+    if (
+      sessionOutcomeIds.has(outcome.id) &&
+      outcome.paymentId === paymentId
+    ) {
       demoRecoveryOutcomes.splice(i, 1)
-      sessionOutcomeIds.delete(outcome.id)
+
+      sessionOutcomeIds.delete(
+        outcome.id,
+      )
     }
   }
-  notifyRuntimeChange('reset', paymentId)
+
+  notifyRuntimeChange(
+    'reset',
+    paymentId,
+  )
 }
 
-/** Confirms a customer id exists in the synthetic dataset (used by services). */
-export async function customerExists(customerId: string): Promise<boolean> {
-  return demoCustomers.some((c) => c.id === customerId)
+/**
+ * Check whether a customer exists in the
+ * synthetic demo dataset.
+ */
+export async function customerExists(
+  customerId: string,
+): Promise<boolean> {
+  return demoCustomers.some(
+    (customer) =>
+      customer.id === customerId,
+  )
 }
 
-let providerInstance: PaymentProvider | null = null
+let providerInstance:
+  PaymentProvider | null = null
 
-/** Returns the active payment provider. Currently always synthetic. */
+/**
+ * Return the active payment provider.
+ *
+ * Currently this always returns the synthetic provider.
+ */
 export function getPaymentProvider(): PaymentProvider {
   if (!providerInstance) {
-    providerInstance = new SyntheticPaymentProvider()
+    providerInstance =
+      new SyntheticPaymentProvider()
   }
+
   return providerInstance
 }
+

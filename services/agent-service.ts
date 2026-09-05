@@ -1,9 +1,10 @@
 ﻿/**
- * Agent service â€” the autonomous recovery agent's decisions, event
+ * Agent service — the autonomous recovery agent's decisions, event
  * stream, and a thin session orchestrator over existing services.
  * Integration-ready for a future ML prediction API / LLM agent
  * runtime (e.g. LangGraph); today it reads the synthetic demo dataset.
  */
+
 import type {
   AgentDecision,
   AgentEvent,
@@ -19,34 +20,67 @@ import type {
   RecoveryOutcome,
   RecoveryStrategy,
 } from '@/types'
-import { demoAgentDecisions, demoAgentEvents, demoPredictions } from '@/data/demo'
-import { FAILURE_REASON_LABELS, RECOVERY_ACTION_LABELS } from '@/types'
+
+import {
+  demoAgentDecisions,
+  demoAgentEvents,
+  demoPredictions,
+} from '@/data/demo'
+
+import {
+  FAILURE_REASON_LABELS,
+  RECOVERY_ACTION_LABELS,
+} from '@/types'
+
 import type { PipelineStageKey } from '@/lib/recovery-pipeline'
-import { resetSyntheticSimulation } from '@/lib/providers/payment-provider'
-import { getPayment, retryPayment } from '@/services/payment-service'
+
+import {
+  resetSyntheticSimulation,
+  resumeSyntheticPayment,
+} from '@/lib/providers/payment-provider'
+
+import {
+  getPayment,
+  retryPayment,
+} from '@/services/payment-service'
+
 import { getCustomer } from '@/services/customer-service'
+
 import {
   listStrategies,
   listRecoveryActions,
   listRecoveryOutcomes,
   recordRecoveryOutcome,
 } from '@/services/recovery-service'
+
 import {
   decideApproval,
   ensureApprovalForPayment,
-  getApprovalForPayment,
   listApprovals,
   resetApprovalDecision,
 } from '@/services/approval-service'
+
 import { evaluatePolicy } from '@/services/policy-service'
-import { recordAuditEvent, resetSessionAuditEvents } from '@/services/audit-service'
+
+import {
+  recordAuditEvent,
+  resetSessionAuditEvents,
+} from '@/services/audit-service'
+
 import { notifyRuntimeChange } from '@/lib/runtime-events'
+
 import { getAIRecommendation } from '@/services/ai-recommendation-service'
 
 const sessionAgentEventIds = new Set<string>()
 
 export interface RecoveryActResult {
-  kind: 'retried' | 'queued' | 'awaiting-approval' | 'blocked' | 'already-recovered' | 'held'
+  kind:
+    | 'retried'
+    | 'queued'
+    | 'awaiting-approval'
+    | 'blocked'
+    | 'already-recovered'
+    | 'held'
   ok: boolean
   message: string
 }
@@ -75,36 +109,68 @@ export interface RecoveryStageSnapshot {
   approval?: Approval
 }
 
-export async function listAgentEvents(limit?: number): Promise<AgentEvent[]> {
-  const sorted = [...demoAgentEvents].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
-  return limit ? sorted.slice(0, limit) : sorted
+export async function listAgentEvents(
+  limit?: number,
+): Promise<AgentEvent[]> {
+  const sorted = [...demoAgentEvents].sort((a, b) =>
+    a.timestamp < b.timestamp ? 1 : -1,
+  )
+
+  return limit
+    ? sorted.slice(0, limit)
+    : sorted
 }
 
-export async function listAgentDecisions(paymentId?: string): Promise<AgentDecision[]> {
+export async function listAgentDecisions(
+  paymentId?: string,
+): Promise<AgentDecision[]> {
   const decisions = paymentId
-    ? demoAgentDecisions.filter((d) => d.paymentId === paymentId)
+    ? demoAgentDecisions.filter(
+        (d) => d.paymentId === paymentId,
+      )
     : demoAgentDecisions
-  return [...decisions].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+
+  return [...decisions].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1,
+  )
 }
 
-export async function getPrediction(paymentId: string): Promise<Prediction | undefined> {
-  return demoPredictions.find((p) => p.paymentId === paymentId)
+export async function getPrediction(
+  paymentId: string,
+): Promise<Prediction | undefined> {
+  return demoPredictions.find(
+    (p) => p.paymentId === paymentId,
+  )
 }
 
 export async function listPredictions(): Promise<Prediction[]> {
   return demoPredictions
 }
 
-/** Coarse agent activity state derived from pending decisions, for shell indicators. */
+/**
+ * Coarse agent activity state derived from pending decisions.
+ */
 export async function getAgentState(): Promise<AgentState> {
-  const pending = demoAgentDecisions.some((d) => d.requiresApproval)
-  return pending ? 'awaiting-approval' : 'analyzing'
+  const pending = demoAgentDecisions.some(
+    (d) => d.requiresApproval,
+  )
+
+  return pending
+    ? 'awaiting-approval'
+    : 'analyzing'
 }
 
-async function recordAgentEvent(event: AgentEvent): Promise<AgentEvent> {
+async function recordAgentEvent(
+  event: AgentEvent,
+): Promise<AgentEvent> {
   demoAgentEvents.push(event)
   sessionAgentEventIds.add(event.id)
-  notifyRuntimeChange('agent-event', event.paymentId)
+
+  notifyRuntimeChange(
+    'agent-event',
+    event.paymentId,
+  )
+
   return event
 }
 
@@ -113,88 +179,212 @@ function clockTimestamp(): string {
 }
 
 function clockLabel(): string {
-  return new Date().toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' })
+  return new Date().toLocaleTimeString(
+    'en-IN',
+    {
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    },
+  )
 }
 
-function eventKindForStage(stage: PipelineStageKey, actKind?: RecoveryActResult['kind']): AgentEventKind {
-  if (stage === 'decide' || stage === 'policy-check') return 'decision'
-  if (stage === 'act' && (actKind === 'awaiting-approval' || actKind === 'blocked')) return 'escalation'
-  if (stage === 'act' || stage === 'verify' || stage === 'audit') return 'action'
+function eventKindForStage(
+  stage: PipelineStageKey,
+  actKind?: RecoveryActResult['kind'],
+): AgentEventKind {
+  if (
+    stage === 'decide' ||
+    stage === 'policy-check'
+  ) {
+    return 'decision'
+  }
+
+  if (
+    stage === 'act' &&
+    (
+      actKind === 'awaiting-approval' ||
+      actKind === 'blocked'
+    )
+  ) {
+    return 'escalation'
+  }
+
+  if (
+    stage === 'act' ||
+    stage === 'verify' ||
+    stage === 'audit'
+  ) {
+    return 'action'
+  }
+
   return 'analysis'
 }
 
-function fallbackPrediction(payment: Payment): Prediction {
-  const factors = [
-    payment.failureReason
-      ? `Failure classified as ${FAILURE_REASON_LABELS[payment.failureReason]}`
-      : 'No failure reason on file (payment may already be recovered)',
+function fallbackPrediction(
+  payment: Payment,
+): Prediction {
+  const factors: string[] = []
+
+  if (payment.failureReason) {
+    factors.push(
+      `Failure classified as ${FAILURE_REASON_LABELS[payment.failureReason]}`,
+    )
+  } else {
+    factors.push(
+      'No failure reason on file (payment may already be recovered)',
+    )
+  }
+
+  factors.push(
     `Risk level ${payment.risk}`,
-    `${payment.attempts} recorded attempt${payment.attempts === 1 ? '' : 's'}`,
+  )
+
+  factors.push(
+    `${payment.attempts} recorded attempt${
+      payment.attempts === 1 ? '' : 's'
+    }`,
+  )
+
+  factors.push(
     `Channel ${payment.channel.toUpperCase()}`,
-  ]
+  )
+
   return {
     id: `PR-session-${payment.id}`,
     paymentId: payment.id,
     modelVersion: 'recovery-gbm-v4.2',
-    recoveryProbability: payment.recoveryProbability,
+    recoveryProbability:
+      payment.recoveryProbability,
     confidence: payment.aiConfidence,
     factors,
     generatedAt: payment.updatedAt,
   }
 }
 
-async function resolveDecision(payment: Payment): Promise<{
+async function resolveDecision(
+  payment: Payment,
+): Promise<{
   decision: AgentDecision
   matchedStrategies: RecoveryStrategy[]
 }> {
-  const existing = await listAgentDecisions(payment.id)
-  const strategies = await listStrategies()
+  const existing =
+    await listAgentDecisions(payment.id)
+
+  const strategies =
+    await listStrategies()
+
   let matched = payment.failureReason
     ? strategies.filter(
-        (s) => s.status === 'active' && s.triggerFailureReasons.includes(payment.failureReason!),
+        (s) =>
+          s.status === 'active' &&
+          s.triggerFailureReasons.includes(
+            payment.failureReason!,
+          ),
       )
-    : strategies.filter((s) => s.status === 'active').slice(0, 2)
+    : strategies
+        .filter(
+          (s) => s.status === 'active',
+        )
+        .slice(0, 2)
 
-  // Adaptive recovery â€” if a previous synthetic attempt on this payment failed,
-  // re-prioritize strategies that lead with a different channel and prefer
-  // channel fallback so the next decision actually changes based on history.
-  const priorOutcomes = await listRecoveryOutcomes(payment.id)
-  const priorActions = await listRecoveryActions(payment.id)
-  const failedAction = priorActions.find((a) => a.status === 'failed')
-  const priorFailure: Pick<RecoveryOutcome, 'channel' | 'result'> | undefined =
-    [...priorOutcomes].reverse().find((o) => o.result === 'failed') ??
-    (failedAction ? { channel: failedAction.channel, result: 'failed' as const } : undefined)
+  /**
+   * Adaptive recovery — if a previous synthetic
+   * attempt failed, prefer a different recovery
+   * channel where possible.
+   */
+  const priorOutcomes =
+    await listRecoveryOutcomes(
+      payment.id,
+    )
+
+  const priorActions =
+    await listRecoveryActions(
+      payment.id,
+    )
+
+  const failedAction =
+    priorActions.find(
+      (a) => a.status === 'failed',
+    )
+
+  const priorFailure:
+    | Pick<
+        RecoveryOutcome,
+        'channel' | 'result'
+      >
+    | undefined =
+    [...priorOutcomes].reverse().find(
+      (o) => o.result === 'failed',
+    ) ??
+    (
+      failedAction
+        ? {
+            channel: failedAction.channel,
+            result: 'failed' as const,
+          }
+        : undefined
+    )
+
   const hasFallbackChannel =
     priorFailure !== undefined &&
     matched.some(
-      (s) => s.channelPriority.length > 0 && s.channelPriority[0] !== priorFailure.channel,
+      (s) =>
+        s.channelPriority.length > 0 &&
+        s.channelPriority[0] !==
+          priorFailure.channel,
     )
-  if (priorFailure && hasFallbackChannel) {
+
+  if (
+    priorFailure &&
+    hasFallbackChannel
+  ) {
     matched = [...matched].sort(
       (a, b) =>
         Number(
-          b.channelPriority[0] !== undefined && b.channelPriority[0] !== priorFailure.channel,
+          b.channelPriority[0] !== undefined &&
+            b.channelPriority[0] !==
+              priorFailure.channel,
         ) -
         Number(
-          a.channelPriority[0] !== undefined && a.channelPriority[0] !== priorFailure.channel,
+          a.channelPriority[0] !== undefined &&
+            a.channelPriority[0] !==
+              priorFailure.channel,
         ),
     )
   }
 
   if (existing[0]) {
-    return { decision: existing[0], matchedStrategies: matched }
+    return {
+      decision: existing[0],
+      matchedStrategies: matched,
+    }
   }
 
   const top = matched[0]
-  const alternatives: RecoveryActionType[] = []
-  if (payment.recommendedAction !== 'smart-retry') alternatives.push('smart-retry')
-  if (payment.recommendedAction !== 'retry' && payment.recommendedAction !== 'hold') {
+
+  const alternatives: RecoveryActionType[] =
+    []
+
+  if (
+    payment.recommendedAction !==
+    'smart-retry'
+  ) {
+    alternatives.push('smart-retry')
+  }
+
+  if (
+    payment.recommendedAction !== 'retry' &&
+    payment.recommendedAction !== 'hold'
+  ) {
     alternatives.push('retry')
   }
 
-  // Consult the AI decision layer (LLM if configured, deterministic fallback otherwise).
-  // Policy Engine remains authoritative â€” AI output informs but never overrides policy.
-  const aiRec = await getAIRecommendation(payment)
+  /**
+   * AI informs the decision, but policy remains
+   * authoritative.
+   */
+  const aiRec =
+    await getAIRecommendation(payment)
 
   const recommendedAction: RecoveryActionType =
     priorFailure !== undefined &&
@@ -207,77 +397,196 @@ async function resolveDecision(payment: Payment): Promise<{
     payment.failureReason
       ? `Root cause is ${FAILURE_REASON_LABELS[payment.failureReason]}.`
       : 'No failure reason present on this payment.',
+
     top
-      ? `Matched strategy ${top.name} (${Math.round(top.successRate * 100)}% historical success).`
-      : 'No specialised strategy matched; using the paymentâ€™s recommended action.',
-    `Model confidence is ${Math.round(aiRec.confidence * 100)}% at ${aiRec.riskLevel} risk.`,
+      ? `Matched strategy ${top.name} (${Math.round(
+          top.successRate * 100,
+        )}% historical success).`
+      : 'No specialised strategy matched; using the payment’s recommended action.',
+
+    `Model confidence is ${Math.round(
+      aiRec.confidence * 100,
+    )}% at ${aiRec.riskLevel} risk.`,
   ]
+
   if (priorFailure) {
     reasoning.push(
       hasFallbackChannel && top
-        ? `Previous attempt via ${priorFailure.channel.toUpperCase()} failed â€” re-analyzing and preferring ${top.channelPriority[0]?.toUpperCase()} for the next attempt.`
-        : `Previous attempt via ${priorFailure.channel.toUpperCase()} failed â€” policy and retry limits now decide if another attempt is permitted.`,
+        ? `Previous attempt via ${priorFailure.channel.toUpperCase()} failed — re-analyzing and preferring ${top.channelPriority[0]?.toUpperCase()} for the next attempt.`
+        : `Previous attempt via ${priorFailure.channel.toUpperCase()} failed — policy and retry limits now decide if another attempt is permitted.`,
     )
   }
 
   const decision: AgentDecision = {
     id: `AD-session-${payment.id}`,
     paymentId: payment.id,
-    summary: RECOVERY_ACTION_LABELS[recommendedAction],
+
+    summary:
+      RECOVERY_ACTION_LABELS[
+        recommendedAction
+      ],
+
     reasoning,
-    confidence: aiRec.confidence,
+
+    confidence:
+      aiRec.confidence,
+
     recommendedAction,
-    alternativeActions: aiRec.alternativeActions.length > 0 ? aiRec.alternativeActions : alternatives,
-    requiresApproval: recommendedAction === 'human-approval' || aiRec.escalationRecommended,
-    policyId: recommendedAction === 'human-approval' ? 'PL-02' : 'PL-01',
-    createdAt: payment.updatedAt,
+
+    alternativeActions:
+      aiRec.alternativeActions.length > 0
+        ? aiRec.alternativeActions
+        : alternatives,
+
+    requiresApproval:
+      recommendedAction ===
+        'human-approval' ||
+      aiRec.escalationRecommended,
+
+    policyId:
+      recommendedAction ===
+      'human-approval'
+        ? 'PL-02'
+        : 'PL-01',
+
+    createdAt:
+      payment.updatedAt,
+
     aiRecommendation: {
-      source: aiRec.status.source,
-      provider: aiRec.status.provider,
-      model: aiRec.status.model,
-      recommendedAction: aiRec.recommendedAction,
-      recommendedChannel: aiRec.recommendedChannel,
-      reasoning: aiRec.reasoning,
-      fallbackReason: aiRec.status.fallbackReason,
+      source:
+        aiRec.status.source,
+
+      provider:
+        aiRec.status.provider,
+
+      model:
+        aiRec.status.model,
+
+      recommendedAction:
+        aiRec.recommendedAction,
+
+      recommendedChannel:
+        aiRec.recommendedChannel,
+
+      reasoning:
+        aiRec.reasoning,
+
+      fallbackReason:
+        aiRec.status.fallbackReason,
     },
   }
 
-  return { decision, matchedStrategies: matched }
+  return {
+    decision,
+    matchedStrategies: matched,
+  }
 }
 
-async function emitSnapshot(snapshot: Omit<RecoveryStageSnapshot, 'agentEvent'> & { agentEvent?: AgentEvent }): Promise<RecoveryStageSnapshot> {
-  const timestamp = clockTimestamp()
-  const agentEvent = await recordAgentEvent({
-    id: `AE-session-${snapshot.paymentId}-${snapshot.stage}-${timestamp}`,
-    kind: eventKindForStage(snapshot.stage, snapshot.actResult?.kind),
-    title: snapshot.title,
-    description: snapshot.description,
-    paymentId: snapshot.paymentId,
-    confidence: snapshot.decision?.confidence ?? snapshot.prediction?.confidence ?? snapshot.payment.aiConfidence,
-    timestamp,
-  })
-  return { ...snapshot, agentEvent }
+async function emitSnapshot(
+  snapshot: Omit<
+    RecoveryStageSnapshot,
+    'agentEvent'
+  > & {
+    agentEvent?: AgentEvent
+  },
+): Promise<RecoveryStageSnapshot> {
+  const timestamp =
+    clockTimestamp()
+
+  const agentEvent =
+    await recordAgentEvent({
+      id: `AE-session-${snapshot.paymentId}-${snapshot.stage}-${timestamp}`,
+
+      kind: eventKindForStage(
+        snapshot.stage,
+        snapshot.actResult?.kind,
+      ),
+
+      title:
+        snapshot.title,
+
+      description:
+        snapshot.description,
+
+      paymentId:
+        snapshot.paymentId,
+
+      confidence:
+        snapshot.decision?.confidence ??
+        snapshot.prediction?.confidence ??
+        snapshot.payment.aiConfidence,
+
+      timestamp,
+    })
+
+  return {
+    ...snapshot,
+    agentEvent,
+  }
 }
 
 /**
- * Execute a single lifecycle stage for an existing demo payment.
- * Composes payment, customer, prediction, decision, policy, recovery, and audit services.
+ * Handle a human approval decision.
+ *
+ * IMPORTANT:
+ * Approval state and payment execution state
+ * are separate.
+ *
+ * When approved, a payment held in
+ * `pending-approval` must be moved back to
+ * `at-risk` before the Act stage can execute
+ * the synthetic retry.
  */
 export async function decideRecoveryApproval(
   paymentId: string,
   approvalId: string,
-  decision: 'approved' | 'rejected',
+  decision:
+    | 'approved'
+    | 'rejected',
 ): Promise<Approval | undefined> {
-  const approval = await decideApproval(approvalId, decision)
-  if (!approval || approval.paymentId !== paymentId) return undefined
+  const approval =
+    await decideApproval(
+      approvalId,
+      decision,
+    )
 
-  if (decision === 'rejected') {
+  if (
+    !approval ||
+    approval.paymentId !== paymentId
+  ) {
+    return undefined
+  }
+
+  if (
+    decision === 'approved'
+  ) {
+    /**
+     * Resume the synthetic payment so the next
+     * pipeline stage can execute.
+     *
+     * This performs NO real Razorpay operation.
+     */
+    resumeSyntheticPayment(
+      paymentId,
+    )
+  }
+
+  if (
+    decision === 'rejected'
+  ) {
     await recordAuditEvent({
       id: `A-session-${paymentId}-rejected-${Date.now()}`,
+
       actor: 'human',
-      action: 'Rejected recovery approval',
+
+      action:
+        'Rejected recovery approval',
+
       target: paymentId,
-      timestamp: clockLabel(),
+
+      timestamp:
+        clockLabel(),
+
       status: 'failed',
     })
   }
@@ -289,34 +598,52 @@ export async function runRecoveryStage(
   paymentId: string,
   stage: PipelineStageKey,
 ): Promise<RecoveryStageSnapshot> {
-  const payment = await getPayment(paymentId)
+  const payment =
+    await getPayment(paymentId)
+
   if (!payment) {
-    throw new Error(`No demo payment found for ${paymentId}.`)
+    throw new Error(
+      `No demo payment found for ${paymentId}.`,
+    )
   }
 
   switch (stage) {
     case 'observe': {
-      const title = `Observed ${payment.id}`
+      const title =
+        `Observed ${payment.id}`
+
       const description =
         payment.status === 'recovered'
-          ? `${payment.customerName} Â· ${payment.paymentMethodLabel} is already recovered.`
-          : `${payment.customerName} Â· ${payment.paymentMethodLabel} is ${payment.status.replace('-', ' ')}.`
+          ? `${payment.customerName} · ${payment.paymentMethodLabel} is already recovered.`
+          : `${payment.customerName} · ${payment.paymentMethodLabel} is ${payment.status.replace('-', ' ')}.`
+
       return emitSnapshot({
         paymentId,
         stage,
         payment,
         title,
         description,
-        agentState: 'analyzing',
+        agentState:
+          'analyzing',
       })
     }
 
     case 'analyze': {
-      const customer = await getCustomer(payment.customerId)
-      const reason = payment.failureReason
-        ? FAILURE_REASON_LABELS[payment.failureReason]
-        : 'No failure on file'
-      const title = `Analyzed ${payment.id}`
+      const customer =
+        await getCustomer(
+          payment.customerId,
+        )
+
+      const reason =
+        payment.failureReason
+          ? FAILURE_REASON_LABELS[
+              payment.failureReason
+            ]
+          : 'No failure on file'
+
+      const title =
+        `Analyzed ${payment.id}`
+
       const description = [
         `Root cause: ${reason}.`,
         `Risk ${payment.risk}.`,
@@ -324,62 +651,144 @@ export async function runRecoveryStage(
           ? `Customer ${customer.name} (${customer.segment}, ${customer.recoveredCount} prior recoveries, ${customer.failedCount} failures).`
           : `Customer ${payment.customerName}.`,
       ].join(' ')
+
       return emitSnapshot({
         paymentId,
         stage,
         payment,
         title,
         description,
-        agentState: 'analyzing',
+        agentState:
+          'analyzing',
       })
     }
 
     case 'predict': {
-      const stored = await getPrediction(paymentId)
-      const prediction = stored ?? fallbackPrediction(payment)
-      const title = `Predicted recovery for ${payment.id}`
-      const description = `${Math.round(prediction.recoveryProbability * 100)}% recovery probability (${Math.round(prediction.confidence * 100)}% model confidence, ${prediction.modelVersion}).`
+      const stored =
+        await getPrediction(
+          paymentId,
+        )
+
+      const prediction =
+        stored ??
+        fallbackPrediction(
+          payment,
+        )
+
+      const title =
+        `Predicted recovery for ${payment.id}`
+
+      const description =
+        `${Math.round(
+          prediction.recoveryProbability *
+            100,
+        )}% recovery probability (${Math.round(
+          prediction.confidence * 100,
+        )}% model confidence, ${prediction.modelVersion}).`
+
       return emitSnapshot({
         paymentId,
         stage,
         payment,
         title,
         description,
-        agentState: 'analyzing',
+        agentState:
+          'analyzing',
         prediction,
       })
     }
 
     case 'decide': {
-      const { decision, matchedStrategies } = await resolveDecision(payment)
-      const title = `Decision for ${payment.id}`
-      const description = `${decision.summary}${matchedStrategies[0] ? ` Â· strategy ${matchedStrategies[0].name}` : ''}.`
+      const {
+        decision,
+        matchedStrategies,
+      } =
+        await resolveDecision(
+          payment,
+        )
+
+      const title =
+        `Decision for ${payment.id}`
+
+      const description =
+        `${decision.summary}${
+          matchedStrategies[0]
+            ? ` · strategy ${matchedStrategies[0].name}`
+            : ''
+        }.`
+
       return emitSnapshot({
         paymentId,
         stage,
         payment,
         title,
         description,
-        agentState: decision.requiresApproval ? 'awaiting-approval' : 'analyzing',
+        agentState:
+          decision.requiresApproval
+            ? 'awaiting-approval'
+            : 'analyzing',
+
         decision,
+
         matchedStrategies,
-        prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(payment),
+
+        prediction:
+          (await getPrediction(
+            paymentId,
+          )) ??
+          fallbackPrediction(
+            payment,
+          ),
       })
     }
 
     case 'policy-check': {
-      const { decision } = await resolveDecision(payment)
-      const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
-      const title = `Policy check for ${payment.id}`
-      const description = `${policyEvaluation.verdict === 'requiresApproval' ? 'Requires approval' : policyEvaluation.verdict === 'blocked' ? 'Blocked' : 'Allowed'} Â· ${policyEvaluation.policyId}: ${policyEvaluation.reason}`
-      const agentState: AgentState = policyEvaluation.blocked
-        ? 'paused'
-        : policyEvaluation.requiresApproval
-          ? 'awaiting-approval'
-          : 'analyzing'
-      const approval = policyEvaluation.requiresApproval
-        ? await ensureApprovalForPayment(payment, policyEvaluation)
-        : undefined
+      const {
+        decision,
+      } =
+        await resolveDecision(
+          payment,
+        )
+
+      const policyEvaluation =
+        await evaluatePolicy(
+          payment,
+          decision.recommendedAction,
+        )
+
+      const title =
+        `Policy check for ${payment.id}`
+
+      const description =
+        `${
+          policyEvaluation.verdict ===
+          'requiresApproval'
+            ? 'Requires approval'
+            : policyEvaluation.verdict ===
+                'blocked'
+              ? 'Blocked'
+              : 'Allowed'
+        } · ${
+          policyEvaluation.policyId
+        }: ${
+          policyEvaluation.reason
+        }`
+
+      const agentState: AgentState =
+        policyEvaluation.blocked
+          ? 'paused'
+          : policyEvaluation.requiresApproval
+            ? 'awaiting-approval'
+            : 'analyzing'
+
+      const approval =
+        policyEvaluation.requiresApproval
+          ? await ensureApprovalForPayment(
+              payment,
+              policyEvaluation,
+            )
+          : undefined
+
       return emitSnapshot({
         paymentId,
         stage,
@@ -387,147 +796,392 @@ export async function runRecoveryStage(
         title,
         description,
         agentState,
-        decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
+
+        decision: {
+          ...decision,
+          requiresApproval:
+            policyEvaluation.requiresApproval,
+          policyId:
+            policyEvaluation.policyId,
+        },
+
         policyEvaluation,
         approval,
-        prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(payment),
+
+        prediction:
+          (await getPrediction(
+            paymentId,
+          )) ??
+          fallbackPrediction(
+            payment,
+          ),
       })
     }
 
     case 'act': {
-      const { decision } = await resolveDecision(payment)
-      const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
-      let actResult: RecoveryActResult
-      let agentState: AgentState = 'executing'
+      const {
+        decision,
+      } =
+        await resolveDecision(
+          payment,
+        )
 
-      const approval = policyEvaluation.requiresApproval
-        ? await ensureApprovalForPayment(payment, policyEvaluation)
-        : undefined
+      const policyEvaluation =
+        await evaluatePolicy(
+          payment,
+          decision.recommendedAction,
+        )
 
-      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
+      let actResult:
+        RecoveryActResult
+
+      let agentState: AgentState =
+        'executing'
+
+      const approval =
+        policyEvaluation.requiresApproval
+          ? await ensureApprovalForPayment(
+              payment,
+              policyEvaluation,
+            )
+          : undefined
+
+      /**
+       * Re-read the payment after approval handling.
+       *
+       * Approval may have changed:
+       *
+       * pending-approval → at-risk
+       */
+      const latestPayment =
+        (await getPayment(
+          paymentId,
+        )) ??
+        payment
+
+      if (
+        policyEvaluation.requiresApproval &&
+        approval?.status !==
+          'approved'
+      ) {
         actResult = {
-          kind: 'awaiting-approval',
+          kind:
+            'awaiting-approval',
+
           ok: false,
+
           message:
-            approval?.status === 'rejected'
-              ? `Recovery approval was rejected for ${payment.id} â€” no retry was executed.`
-              : `Awaiting human approval for ${payment.id} â€” no retry was executed.`,
+            approval?.status ===
+            'rejected'
+              ? `Recovery approval was rejected for ${payment.id} — no retry was executed.`
+              : `Awaiting human approval for ${payment.id} — no retry was executed.`,
         }
-        agentState = approval?.status === 'rejected' ? 'paused' : 'awaiting-approval'
-      } else if (payment.status === 'recovered') {
+
+        agentState =
+          approval?.status ===
+          'rejected'
+            ? 'paused'
+            : 'awaiting-approval'
+      } else if (
+        latestPayment.status ===
+        'recovered'
+      ) {
         actResult = {
-          kind: 'already-recovered',
+          kind:
+            'already-recovered',
+
           ok: true,
-          message: `${payment.id} is already recovered â€” no further action executed.`,
+
+          message:
+            `${payment.id} is already recovered — no further action executed.`,
         }
-        agentState = 'idle'
-      } else if (policyEvaluation.blocked || payment.status === 'blocked') {
+
+        agentState =
+          'idle'
+      } else if (
+        policyEvaluation.blocked ||
+        latestPayment.status ===
+          'blocked'
+      ) {
         actResult = {
           kind: 'blocked',
+
           ok: false,
-          message: `Action blocked for ${payment.id}. ${policyEvaluation.reason}`,
+
+          message:
+            `Action blocked for ${payment.id}. ${policyEvaluation.reason}`,
         }
-        agentState = 'paused'
-      } else if (decision.recommendedAction === 'human-approval' && approval?.status !== 'approved') {
-        const pending = (await listApprovals('pending')).find((a) => a.paymentId === paymentId)
+
+        agentState =
+          'paused'
+      } else if (
+        decision.recommendedAction ===
+          'human-approval' &&
+        approval?.status !==
+          'approved'
+      ) {
+        const pending =
+          (
+            await listApprovals(
+              'pending',
+            )
+          ).find(
+            (a) =>
+              a.paymentId ===
+              paymentId,
+          )
+
         actResult = {
-          kind: 'awaiting-approval',
+          kind:
+            'awaiting-approval',
+
           ok: false,
+
           message: pending
             ? `Held for human approval (${pending.id}): ${pending.reason}`
             : `Held for human approval under ${policyEvaluation.policyId}. Synthetic retry was not executed.`,
         }
-        agentState = 'awaiting-approval'
-      } else if (decision.recommendedAction === 'hold') {
+
+        agentState =
+          'awaiting-approval'
+      } else if (
+        decision.recommendedAction ===
+        'hold'
+      ) {
         actResult = {
           kind: 'held',
+
           ok: true,
-          message: `Hold applied for ${payment.id} â€” no retry submitted.`,
+
+          message:
+            `Hold applied for ${payment.id} — no retry submitted.`,
         }
-        agentState = 'paused'
+
+        agentState =
+          'paused'
       } else {
-        const retry = await retryPayment(paymentId)
-        const latest = (await getPayment(paymentId)) ?? payment
+        /**
+         * At this point:
+         *
+         * - policy is allowed
+         * - approval, if required, is approved
+         * - payment is executable
+         *
+         * The synthetic provider performs no
+         * real charge.
+         */
+        const retry =
+          await retryPayment(
+            paymentId,
+          )
+
+        const latest =
+          (await getPayment(
+            paymentId,
+          )) ??
+          latestPayment
+
         actResult = {
-          kind: retry.ok ? 'retried' : 'queued',
-          ok: retry.ok,
-          message: retry.message,
+          kind:
+            retry.ok
+              ? 'retried'
+              : 'queued',
+
+          ok:
+            retry.ok,
+
+          message:
+            retry.message,
         }
-        agentState = retry.ok ? 'executing' : 'paused'
+
+        agentState =
+          retry.ok
+            ? 'executing'
+            : 'paused'
+
         return emitSnapshot({
           paymentId,
           stage,
           payment: latest,
-          title: retry.ok ? `Acted on ${payment.id}` : `Action incomplete for ${payment.id}`,
-          description: retry.message,
+
+          title:
+            retry.ok
+              ? `Acted on ${payment.id}`
+              : `Action incomplete for ${payment.id}`,
+
+          description:
+            retry.message,
+
           agentState,
-          decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
+
+          decision: {
+            ...decision,
+            requiresApproval:
+              policyEvaluation.requiresApproval,
+            policyId:
+              policyEvaluation.policyId,
+          },
+
           policyEvaluation,
           approval,
           actResult,
-          prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(latest),
+
+          prediction:
+            (await getPrediction(
+              paymentId,
+            )) ??
+            fallbackPrediction(
+              latest,
+            ),
         })
       }
 
       return emitSnapshot({
         paymentId,
         stage,
-        payment,
+        payment:
+          latestPayment,
+
         title:
-          policyEvaluation.blocked || payment.status === 'blocked'
+          policyEvaluation.blocked ||
+          latestPayment.status ===
+            'blocked'
             ? `Action blocked for ${payment.id}`
-            : actResult.kind === 'awaiting-approval'
+            : actResult.kind ===
+                'awaiting-approval'
               ? `Awaiting approval for ${payment.id}`
-              : actResult.kind === 'already-recovered'
+              : actResult.kind ===
+                  'already-recovered'
                 ? `Already recovered ${payment.id}`
-                : actResult.kind === 'held'
+                : actResult.kind ===
+                    'held'
                   ? `Recovery held for ${payment.id}`
                   : `Acted on ${payment.id}`,
-        description: actResult.message,
+
+        description:
+          actResult.message,
+
         agentState,
-        decision: { ...decision, requiresApproval: policyEvaluation.requiresApproval, policyId: policyEvaluation.policyId },
+
+        decision: {
+          ...decision,
+          requiresApproval:
+            policyEvaluation.requiresApproval,
+          policyId:
+            policyEvaluation.policyId,
+        },
+
         policyEvaluation,
         approval,
         actResult,
-        prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(payment),
+
+        prediction:
+          (await getPrediction(
+            paymentId,
+          )) ??
+          fallbackPrediction(
+            latestPayment,
+          ),
       })
     }
 
     case 'verify': {
-      const latest = (await getPayment(paymentId)) ?? payment
-      const outcomes = await listRecoveryOutcomes(paymentId)
-      let outcome = outcomes[0]
-      const { decision } = await resolveDecision(payment)
-      const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
-      const approval = policyEvaluation.requiresApproval
-        ? await ensureApprovalForPayment(payment, policyEvaluation)
-        : undefined
-      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
-        throw new Error(`Recovery approval is not complete for ${paymentId}.`)
-      }
-
-      if (latest.status === 'recovered' && !outcomes.some((o) => o.result === 'recovered')) {
-        outcome = await recordRecoveryOutcome({
-          id: `RO-session-${paymentId}`,
+      const latest =
+        (await getPayment(
           paymentId,
-          action: decision.recommendedAction,
-          result: 'recovered',
-          amountRecovered: latest.amount,
-          channel: latest.channel,
-          recoveredAt: clockTimestamp(),
-          notes: 'Session synthetic recovery â€” no real funds moved.',
-        })
+        )) ??
+        payment
+
+      const outcomes =
+        await listRecoveryOutcomes(
+          paymentId,
+        )
+
+      let outcome =
+        outcomes[0]
+
+      const {
+        decision,
+      } =
+        await resolveDecision(
+          payment,
+        )
+
+      const policyEvaluation =
+        await evaluatePolicy(
+          payment,
+          decision.recommendedAction,
+        )
+
+      const approval =
+        policyEvaluation.requiresApproval
+          ? await ensureApprovalForPayment(
+              payment,
+              policyEvaluation,
+            )
+          : undefined
+
+      if (
+        policyEvaluation.requiresApproval &&
+        approval?.status !==
+          'approved'
+      ) {
+        throw new Error(
+          `Recovery approval is not complete for ${paymentId}.`,
+        )
       }
 
-      const verifyResult: RecoveryVerifyResult = {
-        status: latest.status,
+      if (
+        latest.status ===
+          'recovered' &&
+        !outcomes.some(
+          (o) =>
+            o.result ===
+            'recovered',
+        )
+      ) {
+        outcome =
+          await recordRecoveryOutcome({
+            id: `RO-session-${paymentId}`,
+
+            paymentId,
+
+            action:
+              decision.recommendedAction,
+
+            result:
+              'recovered',
+
+            amountRecovered:
+              latest.amount,
+
+            channel:
+              latest.channel,
+
+            recoveredAt:
+              clockTimestamp(),
+
+            notes:
+              'Session synthetic recovery — no real funds moved.',
+          })
+      }
+
+      const verifyResult:
+        RecoveryVerifyResult = {
+        status:
+          latest.status,
+
         outcome,
+
         message:
-          latest.status === 'recovered'
+          latest.status ===
+          'recovered'
             ? `Verified recovered ${latest.amount} ${latest.currency} on ${latest.channel}.`
-            : latest.status === 'pending-approval'
+            : latest.status ===
+                'pending-approval'
               ? 'Verified: still awaiting human approval. No recovery yet.'
-              : latest.status === 'blocked'
+              : latest.status ===
+                  'blocked'
                 ? 'Verified: payment remains blocked. No recovery.'
                 : `Verified current status: ${latest.status}.`,
       }
@@ -535,87 +1189,219 @@ export async function runRecoveryStage(
       return emitSnapshot({
         paymentId,
         stage,
-        payment: latest,
-        title: `Verified ${payment.id}`,
-        description: verifyResult.message,
-        agentState: latest.status === 'pending-approval' ? 'awaiting-approval' : latest.status === 'blocked' ? 'paused' : 'idle',
+        payment:
+          latest,
+
+        title:
+          `Verified ${payment.id}`,
+
+        description:
+          verifyResult.message,
+
+        agentState:
+          latest.status ===
+            'pending-approval'
+            ? 'awaiting-approval'
+            : latest.status ===
+                'blocked'
+              ? 'paused'
+              : 'idle',
+
         decision,
         policyEvaluation,
         verifyResult,
-        prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(latest),
+
+        prediction:
+          (await getPrediction(
+            paymentId,
+          )) ??
+          fallbackPrediction(
+            latest,
+          ),
       })
     }
 
     case 'audit': {
-      const latest = (await getPayment(paymentId)) ?? payment
-      const { decision } = await resolveDecision(payment)
-      const policyEvaluation = await evaluatePolicy(payment, decision.recommendedAction)
-      const approval = policyEvaluation.requiresApproval
-        ? await ensureApprovalForPayment(payment, policyEvaluation)
-        : undefined
-      if (policyEvaluation.requiresApproval && approval?.status !== 'approved') {
-        throw new Error(`Recovery approval is not complete for ${paymentId}.`)
+      const latest =
+        (await getPayment(
+          paymentId,
+        )) ??
+        payment
+
+      const {
+        decision,
+      } =
+        await resolveDecision(
+          payment,
+        )
+
+      const policyEvaluation =
+        await evaluatePolicy(
+          payment,
+          decision.recommendedAction,
+        )
+
+      const approval =
+        policyEvaluation.requiresApproval
+          ? await ensureApprovalForPayment(
+              payment,
+              policyEvaluation,
+            )
+          : undefined
+
+      if (
+        policyEvaluation.requiresApproval &&
+        approval?.status !==
+          'approved'
+      ) {
+        throw new Error(
+          `Recovery approval is not complete for ${paymentId}.`,
+        )
       }
-      const outcomes = await listRecoveryOutcomes(paymentId)
-      const auditStatus: AuditEvent['status'] =
-        latest.status === 'recovered' ||
-        latest.status === 'at-risk' ||
-        latest.status === 'in-progress' ||
-        latest.status === 'pending-approval' ||
-        latest.status === 'failed' ||
-        latest.status === 'blocked'
+
+      const outcomes =
+        await listRecoveryOutcomes(
+          paymentId,
+        )
+
+      const auditStatus:
+        AuditEvent['status'] =
+        latest.status ===
+            'recovered' ||
+        latest.status ===
+            'at-risk' ||
+        latest.status ===
+            'in-progress' ||
+        latest.status ===
+            'pending-approval' ||
+        latest.status ===
+            'failed' ||
+        latest.status ===
+            'blocked'
           ? latest.status
           : 'info'
 
-      const auditEvent = await recordAuditEvent({
-        id: `A-session-${paymentId}-${Date.now()}`,
-        actor: 'ai-agent',
-        action: `Lifecycle complete: ${RECOVERY_ACTION_LABELS[decision.recommendedAction]}`,
-        target: paymentId,
-        timestamp: clockLabel(),
-        status: auditStatus,
-      })
+      const auditEvent =
+        await recordAuditEvent({
+          id:
+            `A-session-${paymentId}-${Date.now()}`,
+
+          actor:
+            'ai-agent',
+
+          action:
+            `Lifecycle complete: ${RECOVERY_ACTION_LABELS[decision.recommendedAction]}`,
+
+          target:
+            paymentId,
+
+          timestamp:
+            clockLabel(),
+
+          status:
+            auditStatus,
+        })
 
       return emitSnapshot({
         paymentId,
         stage,
-        payment: latest,
-        title: `Audited ${payment.id}`,
-        description: `${auditEvent.action} Â· recorded at ${auditEvent.timestamp} (${auditEvent.status}).`,
-        agentState: 'idle',
+        payment:
+          latest,
+
+        title:
+          `Audited ${payment.id}`,
+
+        description:
+          `${auditEvent.action} · recorded at ${auditEvent.timestamp} (${auditEvent.status}).`,
+
+        agentState:
+          'idle',
+
         decision,
         policyEvaluation,
         approval,
         auditEvent,
+
         verifyResult: {
-          status: latest.status,
-          outcome: outcomes[0],
-          message: `Audit trail updated for ${paymentId}.`,
+          status:
+            latest.status,
+
+          outcome:
+            outcomes[0],
+
+          message:
+            `Audit trail updated for ${paymentId}.`,
         },
-        prediction: (await getPrediction(paymentId)) ?? fallbackPrediction(latest),
+
+        prediction:
+          (await getPrediction(
+            paymentId,
+          )) ??
+          fallbackPrediction(
+            latest,
+          ),
       })
     }
 
     default: {
-      const _exhaustive: never = stage
-      throw new Error(`Unknown recovery stage: ${String(_exhaustive)}`)
+      const _exhaustive:
+        never = stage
+
+      throw new Error(
+        `Unknown recovery stage: ${String(
+          _exhaustive,
+        )}`,
+      )
     }
   }
 }
 
-export async function resetRecoveryRun(paymentId: string): Promise<void> {
-  await resetSyntheticSimulation(paymentId)
-  await resetApprovalDecision(paymentId)
-  await resetSessionAuditEvents(paymentId)
+export async function resetRecoveryRun(
+  paymentId: string,
+): Promise<void> {
+  await resetSyntheticSimulation(
+    paymentId,
+  )
 
-  for (let i = demoAgentEvents.length - 1; i >= 0; i--) {
-    const event = demoAgentEvents[i]
-    if (!sessionAgentEventIds.has(event.id)) continue
-    if (event.paymentId !== paymentId) continue
-    demoAgentEvents.splice(i, 1)
-    sessionAgentEventIds.delete(event.id)
+  await resetApprovalDecision(
+    paymentId,
+  )
+
+  await resetSessionAuditEvents(
+    paymentId,
+  )
+
+  for (
+    let i =
+      demoAgentEvents.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const event =
+      demoAgentEvents[i]
+
+    if (
+      !sessionAgentEventIds.has(
+        event.id,
+      )
+    ) {
+      continue
+    }
+
+    if (
+      event.paymentId !==
+      paymentId
+    ) {
+      continue
+    }
+
+    demoAgentEvents.splice(
+      i,
+      1,
+    )
+
+    sessionAgentEventIds.delete(
+      event.id,
+    )
   }
 }
-
-
-

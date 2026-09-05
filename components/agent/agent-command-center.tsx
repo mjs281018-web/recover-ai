@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useRef, useState } from 'react'
@@ -362,7 +363,9 @@ export function AgentCommandCenter({
   const [snapshots, setSnapshots] = useState<RecoveryStageSnapshot[]>([])
   const [executedCount, setExecutedCount] = useState(0)
   const [highlightIndex, setHighlightIndex] = useState(-1)
-  const [playback, setPlayback] = useState<'idle' | 'playing' | 'paused' | 'done'>('idle')
+  const [playback, setPlayback] = useState<
+    'idle' | 'playing' | 'paused' | 'done'
+  >('idle')
   const [sessionEvents, setSessionEvents] = useState<AgentEvent[]>([])
   const [hoveredFlow, setHoveredFlow] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -390,7 +393,9 @@ export function AgentCommandCenter({
   }
 
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(
-    approvals.find((approval) => approval.paymentId === defaultPaymentId)?.status ?? 'pending',
+    approvals.find(
+      (approval) => approval.paymentId === defaultPaymentId,
+    )?.status ?? 'pending',
   )
   const [approvalResolved, setApprovalResolved] = useState(false)
 
@@ -415,7 +420,13 @@ export function AgentCommandCenter({
 
   const selectedPayment =
     availablePayments.find((p) => p.id === selectedPaymentId) ??
-    latestOf(snapshots, (s) => (s.paymentId === selectedPaymentId ? s.payment : undefined)) ??
+    latestOf(
+      snapshots,
+      (s) =>
+        s.paymentId === selectedPaymentId
+          ? s.payment
+          : undefined,
+    ) ??
     availablePayments[0]
 
   const featuredDecision =
@@ -425,14 +436,16 @@ export function AgentCommandCenter({
       ? {
           id: `preview-${selectedPayment.id}`,
           paymentId: selectedPayment.id,
-          summary: RECOVERY_ACTION_LABELS[selectedPayment.recommendedAction],
+          summary:
+            RECOVERY_ACTION_LABELS[selectedPayment.recommendedAction],
           reasoning: [
             'Run Decide to generate the full agent decision from this payment and matching strategies.',
           ],
           confidence: selectedPayment.aiConfidence,
           recommendedAction: selectedPayment.recommendedAction,
           alternativeActions: [],
-          requiresApproval: selectedPayment.recommendedAction === 'human-approval',
+          requiresApproval:
+            selectedPayment.recommendedAction === 'human-approval',
           createdAt: selectedPayment.updatedAt,
         }
       : undefined)
@@ -454,7 +467,10 @@ export function AgentCommandCenter({
         }
       : undefined)
 
-  const policyEvaluation = latestOf(snapshots, (s) => s.policyEvaluation)
+  const policyEvaluation = latestOf(
+    snapshots,
+    (s) => s.policyEvaluation,
+  )
   const actResult = latestOf(snapshots, (s) => s.actResult)
   const verifyResult = latestOf(snapshots, (s) => s.verifyResult)
   const auditEvent = latestOf(snapshots, (s) => s.auditEvent)
@@ -462,24 +478,36 @@ export function AgentCommandCenter({
   const liveAgentState =
     snapshots[snapshots.length - 1]?.agentState ?? initialAgentState
 
-  const highlighted = highlightIndex >= 0 ? snapshots[highlightIndex] : undefined
+  const highlighted =
+    highlightIndex >= 0 ? snapshots[highlightIndex] : undefined
 
   const combinedEvents = sessionStartedRef.current
     ? sessionEvents.slice(0, 8)
     : [...sessionEvents, ...events].slice(0, 8)
 
-  const activeEventId = expandedEvent ?? combinedEvents[0]?.id ?? null
+  const activeEventId =
+    expandedEvent ?? combinedEvents[0]?.id ?? null
 
+  /*
+   * CONFIDENCE SOURCE OF TRUTH
+   *
+   * The recovery prediction is the canonical confidence displayed
+   * throughout the Agent Command Center. Previously the header used
+   * featuredDecision.confidence while other sections used
+   * featuredPrediction.confidence, which could produce values such as
+   * 78% in the header and 88% in the recovery result.
+   */
   const confidence =
-    featuredDecision?.confidence ??
     featuredPrediction?.confidence ??
+    featuredDecision?.confidence ??
     selectedPayment?.aiConfidence ??
     0
 
   const expectedRecovery = selectedPayment
     ? Math.round(
         selectedPayment.amount *
-          (featuredPrediction?.recoveryProbability ?? selectedPayment.recoveryProbability),
+          (featuredPrediction?.recoveryProbability ??
+            selectedPayment.recoveryProbability),
       )
     : 0
 
@@ -494,7 +522,9 @@ export function AgentCommandCenter({
     ? { value: 'Blocked', tone: 'danger' as const }
     : modeLabel(liveAgentState)
 
-  async function executeNextStage(): Promise<'continue' | 'waiting' | 'done'> {
+  async function executeNextStage(): Promise<
+    'continue' | 'waiting' | 'done'
+  > {
     const index = executedRef.current
 
     if (index >= AGENT_PIPELINE.length) {
@@ -503,12 +533,18 @@ export function AgentCommandCenter({
 
     const stage = AGENT_PIPELINE[index].key
 
-    if (index > 0 && snapshotsRef.current[index - 1]?.policyEvaluation?.blocked) {
+    if (
+      index > 0 &&
+      snapshotsRef.current[index - 1]?.policyEvaluation?.blocked
+    ) {
       playingRef.current = false
       return 'done'
     }
 
-    const snapshot = await runRecoveryStage(selectedRef.current, stage)
+    const snapshot = await runRecoveryStage(
+      selectedRef.current,
+      stage,
+    )
 
     executedRef.current = index + 1
     snapshotsRef.current = (() => {
@@ -524,7 +560,9 @@ export function AgentCommandCenter({
     })
 
     setExecutedCount(index + 1)
-    setHighlightIndex(index + 1 >= AGENT_PIPELINE.length ? -1 : index)
+    setHighlightIndex(
+      index + 1 >= AGENT_PIPELINE.length ? -1 : index,
+    )
     sessionStartedRef.current = true
 
     setSessionEvents((prev) => [snapshot.agentEvent, ...prev])
@@ -543,11 +581,17 @@ export function AgentCommandCenter({
       return 'waiting'
     }
 
-    return executedRef.current < AGENT_PIPELINE.length ? 'continue' : 'done'
+    return executedRef.current < AGENT_PIPELINE.length
+      ? 'continue'
+      : 'done'
   }
 
   async function handleStep() {
-    if (busy || playingRef.current || executedRef.current >= AGENT_PIPELINE.length) {
+    if (
+      busy ||
+      playingRef.current ||
+      executedRef.current >= AGENT_PIPELINE.length
+    ) {
       return
     }
 
@@ -558,7 +602,9 @@ export function AgentCommandCenter({
       const result = await executeNextStage()
       setPlayback(result === 'done' ? 'done' : 'paused')
     } catch (err) {
-      setDemoError(err instanceof Error ? err.message : String(err))
+      setDemoError(
+        err instanceof Error ? err.message : String(err),
+      )
     } finally {
       setBusy(false)
     }
@@ -603,7 +649,9 @@ export function AgentCommandCenter({
     } catch (err) {
       if (runIdRef.current === runId) {
         playingRef.current = false
-        setDemoError(err instanceof Error ? err.message : String(err))
+        setDemoError(
+          err instanceof Error ? err.message : String(err),
+        )
         setPlayback('paused')
       }
     } finally {
@@ -616,7 +664,11 @@ export function AgentCommandCenter({
   function handlePause() {
     playingRef.current = false
     runIdRef.current += 1
-    setPlayback(executedRef.current >= AGENT_PIPELINE.length ? 'done' : 'paused')
+    setPlayback(
+      executedRef.current >= AGENT_PIPELINE.length
+        ? 'done'
+        : 'paused',
+    )
     setBusy(false)
   }
 
@@ -688,13 +740,22 @@ export function AgentCommandCenter({
     selectedRef.current = paymentId
     setSelectedPaymentId(paymentId)
     setApprovalStatus(
-      approvals.find((approval) => approval.paymentId === paymentId)?.status ?? 'pending',
+      approvals.find(
+        (approval) => approval.paymentId === paymentId,
+      )?.status ?? 'pending',
     )
   }
 
-  const finished = executedCount >= AGENT_PIPELINE.length
-  const canPlay = !busy && !finished && playback !== 'playing'
-  const canStep = !busy && !finished && playback !== 'playing'
+  const finished =
+    executedCount >= AGENT_PIPELINE.length
+  const canPlay =
+    !busy &&
+    !finished &&
+    playback !== 'playing'
+  const canStep =
+    !busy &&
+    !finished &&
+    playback !== 'playing'
   const canPause = playback === 'playing'
 
   const isAwaitingApproval =
@@ -702,8 +763,14 @@ export function AgentCommandCenter({
     selectedApproval !== undefined &&
     policyEvaluation?.requiresApproval === true
 
-  async function handleApproval(decision: 'approved' | 'rejected') {
-    if (!selectedApproval || approvalStatus !== 'pending' || busy) {
+  async function handleApproval(
+    decision: 'approved' | 'rejected',
+  ) {
+    if (
+      !selectedApproval ||
+      approvalStatus !== 'pending' ||
+      busy
+    ) {
       return
     }
 
@@ -764,7 +831,9 @@ export function AgentCommandCenter({
     } catch (err) {
       if (runIdRef.current === runId) {
         playingRef.current = false
-        setDemoError(err instanceof Error ? err.message : String(err))
+        setDemoError(
+          err instanceof Error ? err.message : String(err),
+        )
         setPlayback('paused')
       }
     } finally {
@@ -806,7 +875,9 @@ export function AgentCommandCenter({
                       <span className="relative inline-flex size-1.5 rounded-full bg-success" />
                     </span>
 
-                    {playback === 'playing' ? 'Running' : 'Active'}
+                    {playback === 'playing'
+                      ? 'Running'
+                      : 'Active'}
                   </Badge>
                 </div>
 
@@ -815,7 +886,8 @@ export function AgentCommandCenter({
                 </p>
 
                 <p className="text-xs text-muted-foreground/70">
-                  Session simulation on existing demo payment {selectedPaymentId}
+                  Session simulation on existing demo payment{' '}
+                  {selectedPaymentId}
                 </p>
               </div>
             </div>
@@ -826,16 +898,27 @@ export function AgentCommandCenter({
                 value={mode.value}
                 tone={mode.tone}
               />
+
               <StatusPill
                 label="Confidence"
                 value={formatPercent(confidence)}
                 tone="success"
               />
+
               <StatusPill
                 label="Risk Guard"
-                value={policyEvaluation?.blocked ? 'Blocked' : 'Active'}
-                tone={policyEvaluation?.blocked ? 'danger' : 'success'}
+                value={
+                  policyEvaluation?.blocked
+                    ? 'Blocked'
+                    : 'Active'
+                }
+                tone={
+                  policyEvaluation?.blocked
+                    ? 'danger'
+                    : 'success'
+                }
               />
+
               <StatusPill
                 label="Policy Engine"
                 value={
@@ -855,6 +938,7 @@ export function AgentCommandCenter({
                       : 'success'
                 }
               />
+
               <StatusPill
                 label="Provider"
                 value="Synthetic"
@@ -875,13 +959,22 @@ export function AgentCommandCenter({
                   key={payment.id}
                   type="button"
                   size="sm"
-                  variant={payment.id === selectedPaymentId ? 'default' : 'outline'}
-                  onClick={() => void handleSelectPayment(payment.id)}
-                  disabled={busy && playback === 'playing'}
+                  variant={
+                    payment.id === selectedPaymentId
+                      ? 'default'
+                      : 'outline'
+                  }
+                  onClick={() =>
+                    void handleSelectPayment(payment.id)
+                  }
+                  disabled={
+                    busy && playback === 'playing'
+                  }
                 >
                   {payment.id}
                   <span className="text-[10px] font-medium opacity-80">
-                    {SCENARIO_LABEL[payment.id] ?? payment.status}
+                    {SCENARIO_LABEL[payment.id] ??
+                      payment.status}
                   </span>
                 </Button>
               ))}
@@ -901,6 +994,7 @@ export function AgentCommandCenter({
                 ) : (
                   <Play className="size-4" />
                 )}
+
                 {playback === 'playing'
                   ? 'Running Recovery...'
                   : finished
@@ -938,7 +1032,9 @@ export function AgentCommandCenter({
                   size="sm"
                   variant="ghost"
                   onClick={() => void handleReset()}
-                  disabled={busy && playback === 'playing'}
+                  disabled={
+                    busy && playback === 'playing'
+                  }
                   className="gap-1.5"
                 >
                   <RotateCcw className="size-3.5" />
@@ -955,10 +1051,17 @@ export function AgentCommandCenter({
                     · {selectedPayment.customerName} ·{' '}
                     {formatCurrency(selectedPayment.amount)}
                   </span>
+
                   <span className="capitalize">
-                    Status: {selectedPayment.status.replace('-', ' ')}
-                    {' · '}Channel: {selectedPayment.channel}
-                    {' · '}Risk: {selectedPayment.risk}
+                    Status:{' '}
+                    {selectedPayment.status.replace(
+                      '-',
+                      ' ',
+                    )}
+                    {' · '}Channel:{' '}
+                    {selectedPayment.channel}
+                    {' · '}Risk:{' '}
+                    {selectedPayment.risk}
                   </span>
                 </div>
               )}
@@ -969,8 +1072,12 @@ export function AgentCommandCenter({
               <div className="flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-muted/20 px-3 py-2.5 text-sm">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
                 <div>
-                  <div className="font-medium text-danger">Demo error</div>
-                  <div className="text-xs text-muted-foreground">{demoError}</div>
+                  <div className="font-medium text-danger">
+                    Demo error
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {demoError}
+                  </div>
                 </div>
               </div>
             )}
@@ -979,29 +1086,39 @@ export function AgentCommandCenter({
             {isAwaitingApproval && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/25 bg-warning-muted/30 px-3 py-2.5">
                 <ShieldAlert className="size-4 shrink-0 text-warning" />
+
                 <span className="text-sm font-medium text-warning">
                   Awaiting human approval
-                  {selectedApproval ? ` · ${selectedApproval.id}` : ''}
+                  {selectedApproval
+                    ? ` · ${selectedApproval.id}`
+                    : ''}
                 </span>
+
                 <span className="text-xs text-muted-foreground">
                   {selectedApproval?.reason}
                 </span>
+
                 <div className="ml-auto flex items-center gap-2">
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => void handleApproval('approved')}
+                    onClick={() =>
+                      void handleApproval('approved')
+                    }
                     disabled={busy}
                     className="gap-1.5"
                   >
                     <Check className="size-3.5" />
                     Approve
                   </Button>
+
                   <Button
                     type="button"
                     size="sm"
                     variant="destructive"
-                    onClick={() => void handleApproval('rejected')}
+                    onClick={() =>
+                      void handleApproval('rejected')
+                    }
                     disabled={busy}
                     className="gap-1.5"
                   >
@@ -1012,26 +1129,32 @@ export function AgentCommandCenter({
               </div>
             )}
 
-            {approvalStatus === 'rejected' && approvalResolved && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-muted/30 px-3 py-2.5">
-                <ShieldOff className="size-4 shrink-0 text-danger" />
-                <span className="text-sm font-medium text-danger">
-                  Approval rejected — recovery halted.
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  No retry was executed. Rejection recorded in the audit trail.
-                </span>
-              </div>
-            )}
+            {approvalStatus === 'rejected' &&
+              approvalResolved && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-danger/25 bg-danger-muted/30 px-3 py-2.5">
+                  <ShieldOff className="size-4 shrink-0 text-danger" />
 
-            {approvalStatus === 'approved' && approvalResolved && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/25 bg-success-muted/30 px-3 py-2.5">
-                <ShieldCheck className="size-4 shrink-0 text-success" />
-                <span className="text-sm font-medium text-success">
-                  Approval granted — resuming recovery.
-                </span>
-              </div>
-            )}
+                  <span className="text-sm font-medium text-danger">
+                    Approval rejected — recovery halted.
+                  </span>
+
+                  <span className="text-xs text-muted-foreground">
+                    No retry was executed. Rejection recorded
+                    in the audit trail.
+                  </span>
+                </div>
+              )}
+
+            {approvalStatus === 'approved' &&
+              approvalResolved && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/25 bg-success-muted/30 px-3 py-2.5">
+                  <ShieldCheck className="size-4 shrink-0 text-success" />
+
+                  <span className="text-sm font-medium text-success">
+                    Approval granted — resuming recovery.
+                  </span>
+                </div>
+              )}
           </div>
         </CardContent>
       </Card>
@@ -1045,64 +1168,94 @@ export function AgentCommandCenter({
         <Card
           className={cn(
             'border-success/30',
-            policyEvaluation?.blocked || approvalStatus === 'rejected'
+            policyEvaluation?.blocked ||
+              approvalStatus === 'rejected'
               ? 'border-danger/30'
               : 'border-success/30',
           )}
         >
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
-              {policyEvaluation?.blocked || approvalStatus === 'rejected' ? (
+              {policyEvaluation?.blocked ||
+              approvalStatus === 'rejected' ? (
                 <ShieldOff className="size-5 text-danger" />
               ) : (
                 <CircleCheckBig className="size-5 text-success" />
               )}
+
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 RECOVERY DEMO COMPLETE
               </h3>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <SummaryRow label="Payment" value={selectedPayment?.id ?? '—'} />
-              <SummaryRow label="Customer" value={selectedPayment?.customerName ?? '—'} />
+              <SummaryRow
+                label="Payment"
+                value={selectedPayment?.id ?? '—'}
+              />
+
+              <SummaryRow
+                label="Customer"
+                value={selectedPayment?.customerName ?? '—'}
+              />
+
               <SummaryRow
                 label="Amount"
-                value={selectedPayment ? formatCurrency(selectedPayment.amount) : '—'}
+                value={
+                  selectedPayment
+                    ? formatCurrency(
+                        selectedPayment.amount,
+                      )
+                    : '—'
+                }
               />
+
               <SummaryRow
                 label="AI Decision"
                 value={
                   featuredDecision
-                    ? RECOVERY_ACTION_LABELS[featuredDecision.recommendedAction]
+                    ? RECOVERY_ACTION_LABELS[
+                        featuredDecision
+                          .recommendedAction
+                      ]
                     : '—'
                 }
               />
+
               <SummaryRow
                 label="Recovery Probability"
                 value={
                   featuredPrediction
-                    ? formatPercent(featuredPrediction.recoveryProbability)
+                    ? formatPercent(
+                        featuredPrediction.recoveryProbability,
+                      )
                     : '—'
                 }
               />
+
               <SummaryRow
                 label="AI Confidence"
                 value={
                   featuredPrediction
-                    ? formatPercent(featuredPrediction.confidence)
+                    ? formatPercent(
+                        featuredPrediction.confidence,
+                      )
                     : '—'
                 }
               />
+
               <SummaryRow
                 label="AI Source"
                 value={
-                  featuredDecision?.aiRecommendation?.source === 'ai-llm' &&
+                  featuredDecision?.aiRecommendation
+                    ?.source === 'ai-llm' &&
                   featuredDecision.aiRecommendation.provider &&
                   featuredDecision.aiRecommendation.model
                     ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
                     : 'Deterministic AI fallback · rule-based'
                 }
               />
+
               <SummaryRow
                 label="Policy"
                 value={
@@ -1122,15 +1275,20 @@ export function AgentCommandCenter({
                       : 'success'
                 }
               />
+
               <SummaryRow
                 label="Recovery"
                 value={
                   verifyResult
                     ? verifyResult.status === 'recovered'
                       ? 'Recovered'
-                      : verifyResult.status === 'blocked'
+                      : verifyResult.status ===
+                          'blocked'
                         ? 'Blocked'
-                        : verifyResult.status.replace('-', ' ')
+                        : verifyResult.status.replace(
+                            '-',
+                            ' ',
+                          )
                     : policyEvaluation?.blocked
                       ? 'Not executed'
                       : '—'
@@ -1138,37 +1296,57 @@ export function AgentCommandCenter({
                 tone={
                   verifyResult?.status === 'recovered'
                     ? 'success'
-                    : verifyResult?.status === 'blocked' || policyEvaluation?.blocked
+                    : verifyResult?.status ===
+                          'blocked' ||
+                        policyEvaluation?.blocked
                       ? 'danger'
                       : 'neutral'
                 }
               />
+
               <SummaryRow
                 label="Verification"
-                value={verifyResult ? verifyResult.message : '—'}
+                value={
+                  verifyResult
+                    ? verifyResult.message
+                    : '—'
+                }
               />
+
               <SummaryRow
                 label="Audit"
-                value={auditEvent ? `Recorded · ${auditEvent.id}` : 'Recorded'}
+                value={
+                  auditEvent
+                    ? `Recorded · ${auditEvent.id}`
+                    : 'Recorded'
+                }
                 tone="success"
               />
             </div>
 
             {policyEvaluation?.blocked && (
               <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
-                <span className="font-medium text-danger">Policy block: </span>
-                <span className="text-muted-foreground">{policyEvaluation.reason}</span>
-              </div>
-            )}
-
-            {approvalStatus === 'rejected' && approvalResolved && (
-              <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
-                <span className="font-medium text-danger">Approval rejected — recovery halted. </span>
+                <span className="font-medium text-danger">
+                  Policy block:{' '}
+                </span>
                 <span className="text-muted-foreground">
-                  Recovery halted and recorded in the audit trail.
+                  {policyEvaluation.reason}
                 </span>
               </div>
             )}
+
+            {approvalStatus === 'rejected' &&
+              approvalResolved && (
+                <div className="mt-3 rounded-lg border border-danger/25 bg-danger-muted/20 p-3 text-sm">
+                  <span className="font-medium text-danger">
+                    Approval rejected — recovery halted.{' '}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Recovery halted and recorded in the audit
+                    trail.
+                  </span>
+                </div>
+              )}
           </CardContent>
         </Card>
       )}
@@ -1180,30 +1358,46 @@ export function AgentCommandCenter({
             <Activity className="size-4 text-ai" />
             Recovery Lifecycle
           </CardTitle>
+
           <CardDescription>
-            The eight-stage pipeline the agent runs for every at-risk payment.
+            The eight-stage pipeline the agent runs for every
+            at-risk payment.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="pt-0">
           <div className="scrollbar-thin flex items-stretch gap-1 overflow-x-auto pb-2">
             {AGENT_PIPELINE.map((stage, i) => {
-              const blocked = snapshots[i]?.policyEvaluation?.blocked === true
+              const blocked =
+                snapshots[i]?.policyEvaluation?.blocked ===
+                true
+
               const blockedIndex = snapshots.findIndex(
-                (s) => s?.policyEvaluation?.blocked === true,
+                (s) =>
+                  s?.policyEvaluation?.blocked === true,
               )
+
               const stopped =
-                blockedIndex >= 0 && i > blockedIndex && i >= executedCount
-              const done = i < executedCount && !blocked
+                blockedIndex >= 0 &&
+                i > blockedIndex &&
+                i >= executedCount
+
+              const done =
+                i < executedCount && !blocked
 
               const active =
                 i === highlightIndex ||
-                (playback === 'playing' && i === executedCount && busy)
+                (playback === 'playing' &&
+                  i === executedCount &&
+                  busy)
 
               const Icon = STAGE_ICON[stage.key]
 
               return (
-                <div key={stage.key} className="flex items-stretch gap-1">
+                <div
+                  key={stage.key}
+                  className="flex items-stretch gap-1"
+                >
                   <Tooltip
                     content={
                       stopped
@@ -1307,17 +1501,25 @@ export function AgentCommandCenter({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <ShieldOff className="size-4 text-danger" />
+
                   <span className="text-xs font-semibold tracking-wide text-danger uppercase">
                     Recovery stopped by policy
                   </span>
                 </div>
-                <Badge variant="danger">{policyEvaluation.policyId}</Badge>
+
+                <Badge variant="danger">
+                  {policyEvaluation.policyId}
+                </Badge>
               </div>
+
               <p className="mt-1.5 text-sm font-medium text-foreground">
                 {policyEvaluation.reason}
               </p>
+
               <p className="mt-1 text-xs text-muted-foreground">
-                Act, Verify, and Audit were not executed. No retry was attempted. The blocked reason remains visible above.
+                Act, Verify, and Audit were not executed. No retry
+                was attempted. The blocked reason remains visible
+                above.
               </p>
             </div>
           )}
@@ -1326,9 +1528,13 @@ export function AgentCommandCenter({
             <div className="mt-4 rounded-lg border border-ai/20 bg-ai-muted/20 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-semibold tracking-wide text-ai uppercase">
-                  {AGENT_PIPELINE[highlightIndex]?.label} result
+                  {AGENT_PIPELINE[highlightIndex]?.label}{' '}
+                  result
                 </div>
-                <Badge variant="ai">{highlighted.paymentId}</Badge>
+
+                <Badge variant="ai">
+                  {highlighted.paymentId}
+                </Badge>
               </div>
 
               <p className="mt-1 text-sm font-medium text-foreground">
@@ -1357,6 +1563,7 @@ export function AgentCommandCenter({
               <CircleDot className="size-4 text-ai" />
               Live Agent Activity
             </CardTitle>
+
             <CardDescription>
               Real-time event stream from the recovery agent.
             </CardDescription>
@@ -1366,11 +1573,16 @@ export function AgentCommandCenter({
             <div className="flex flex-col gap-0">
               {combinedEvents.map((event, i) => {
                 const Icon = KIND_ICON[event.kind]
-                const isOpen = activeEventId === event.id
-                const isLast = i === combinedEvents.length - 1
+                const isOpen =
+                  activeEventId === event.id
+                const isLast =
+                  i === combinedEvents.length - 1
 
                 return (
-                  <div key={event.id} className="relative">
+                  <div
+                    key={event.id}
+                    className="relative"
+                  >
                     {!isLast && (
                       <div className="absolute top-9 left-3.5 h-full w-px bg-border" />
                     )}
@@ -1378,7 +1590,9 @@ export function AgentCommandCenter({
                     <button
                       type="button"
                       onClick={() =>
-                        setExpandedEvent(isOpen ? null : event.id)
+                        setExpandedEvent(
+                          isOpen ? null : event.id,
+                        )
                       }
                       className="flex w-full items-start gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-accent/30"
                     >
@@ -1401,14 +1615,18 @@ export function AgentCommandCenter({
                           <span className="font-mono text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                             {KIND_LABEL[event.kind]}
                           </span>
+
                           <span className="font-mono text-[10px] tabular-nums text-muted-foreground/60">
-                            {formatTimestampLabel(event.timestamp)}
+                            {formatTimestampLabel(
+                              event.timestamp,
+                            )}
                           </span>
                         </div>
 
                         <p className="text-sm font-medium leading-snug text-foreground">
                           {event.title}
                         </p>
+
                         <p className="truncate text-xs text-muted-foreground">
                           {event.description}
                         </p>
@@ -1432,11 +1650,15 @@ export function AgentCommandCenter({
                             </span>
                           </span>
                         )}
-                        {event.confidence !== undefined && (
+
+                        {event.confidence !==
+                          undefined && (
                           <span>
                             Confidence{' '}
                             <span className="font-medium text-foreground">
-                              {formatPercent(event.confidence)}
+                              {formatPercent(
+                                event.confidence,
+                              )}
                             </span>
                           </span>
                         )}
@@ -1457,8 +1679,10 @@ export function AgentCommandCenter({
                 <Brain className="size-4 text-ai" />
                 AI Decision Panel
               </CardTitle>
+
               <CardDescription>
-                The agent&apos;s reasoning behind its most recent recovery decision.
+                The agent&apos;s reasoning behind its most recent
+                recovery decision.
               </CardDescription>
             </CardHeader>
 
@@ -1468,28 +1692,40 @@ export function AgentCommandCenter({
                   <span className="font-mono text-xs text-muted-foreground">
                     {featuredDecision.paymentId}
                   </span>
+
                   <p className="text-base font-semibold text-foreground">
                     {featuredDecision.summary}
                   </p>
                 </div>
 
-                <Badge variant="ai" className="shrink-0">
-                  {RECOVERY_ACTION_LABELS[featuredDecision.recommendedAction]}
+                <Badge
+                  variant="ai"
+                  className="shrink-0"
+                >
+                  {
+                    RECOVERY_ACTION_LABELS[
+                      featuredDecision.recommendedAction
+                    ]
+                  }
                 </Badge>
 
                 {featuredDecision.aiRecommendation && (
                   <Badge
                     variant={
-                      featuredDecision.aiRecommendation.source === 'ai-llm'
+                      featuredDecision.aiRecommendation
+                        .source === 'ai-llm'
                         ? 'ai'
                         : 'neutral'
                     }
                     className="shrink-0"
                   >
-                    {featuredDecision.aiRecommendation.source === 'ai-llm'
+                    {featuredDecision.aiRecommendation
+                      .source === 'ai-llm'
                       ? `AI · ${featuredDecision.aiRecommendation.provider}/${featuredDecision.aiRecommendation.model}`
                       : `Fallback${
-                          featuredDecision.aiRecommendation.fallbackReason
+                          featuredDecision
+                            .aiRecommendation
+                            .fallbackReason
                             ? ` — ${featuredDecision.aiRecommendation.fallbackReason}`
                             : ''
                         }`}
@@ -1503,8 +1739,9 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Confidence
                   </div>
+
                   <div className="mt-1 text-lg font-semibold tabular-nums text-ai">
-                    {formatPercent(featuredDecision.confidence)}
+                    {formatPercent(confidence)}
                   </div>
                 </div>
 
@@ -1512,12 +1749,14 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Risk
                   </div>
+
                   <div
                     className={cn(
                       'mt-1 text-lg font-semibold capitalize',
                       selectedPayment?.risk === 'low'
                         ? 'text-success'
-                        : selectedPayment?.risk === 'medium'
+                        : selectedPayment?.risk ===
+                            'medium'
                           ? 'text-warning'
                           : 'text-danger',
                     )}
@@ -1530,29 +1769,20 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Policy
                   </div>
-                  <PolicyStatus evaluation={policyEvaluation} />
+
+                  <PolicyStatus
+                    evaluation={policyEvaluation}
+                  />
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface/40 p-3">
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Approval
                   </div>
-                  <div
-                    className={cn(
-                      'mt-1 text-lg font-semibold',
-                      !policyEvaluation?.blocked &&
-                        (policyEvaluation?.requiresApproval ||
-                          featuredDecision.requiresApproval)
-                        ? 'text-warning'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    {!policyEvaluation?.blocked &&
-                    (policyEvaluation?.requiresApproval ||
-                      featuredDecision.requiresApproval)
-                      ? 'Required'
-                      : 'Not required'}
-                  </div>
+
+                  <ApprovalStatusDisplay
+                    evaluation={policyEvaluation}
+                  />
                 </div>
               </div>
 
@@ -1561,16 +1791,19 @@ export function AgentCommandCenter({
                 <span className="text-xs font-semibold tracking-wide text-muted-foreground/70 uppercase">
                   Reasoning
                 </span>
+
                 <ul className="space-y-2">
-                  {featuredDecision.reasoning.map((line, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
-                    >
-                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ai" />
-                      <span>{line}</span>
-                    </li>
-                  ))}
+                  {featuredDecision.reasoning.map(
+                    (line, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
+                      >
+                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ai" />
+                        <span>{line}</span>
+                      </li>
+                    ),
+                  )}
                 </ul>
               </div>
 
@@ -1579,10 +1812,12 @@ export function AgentCommandCenter({
                 <div className="space-y-4 rounded-xl border border-ai/20 bg-ai-muted/10 p-4">
                   <div className="flex items-center gap-2">
                     <Brain className="size-4 text-ai" />
+
                     <div>
                       <div className="text-sm font-semibold text-foreground">
                         Why this decision?
                       </div>
+
                       <div className="text-xs text-muted-foreground">
                         Key signals used by the recovery agent.
                       </div>
@@ -1594,8 +1829,11 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Transaction
                       </div>
+
                       <div className="mt-1 text-sm font-semibold tabular-nums text-foreground">
-                        {formatCurrency(decisionExplanation.amount)}
+                        {formatCurrency(
+                          decisionExplanation.amount,
+                        )}
                       </div>
                     </div>
 
@@ -1603,8 +1841,11 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Recovery Probability
                       </div>
+
                       <div className="mt-1 text-sm font-semibold tabular-nums text-ai">
-                        {formatPercent(decisionExplanation.recoveryProbability)}
+                        {formatPercent(
+                          decisionExplanation.recoveryProbability,
+                        )}
                       </div>
                     </div>
 
@@ -1612,6 +1853,7 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Previous Attempts
                       </div>
+
                       <div className="mt-1 text-sm font-semibold tabular-nums text-foreground">
                         {decisionExplanation.attempts}
                       </div>
@@ -1621,6 +1863,7 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Human Approval
                       </div>
+
                       <div
                         className={cn(
                           'mt-1 text-sm font-semibold',
@@ -1644,6 +1887,7 @@ export function AgentCommandCenter({
                     <div className="space-y-2">
                       <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <CircleDot className="mt-0.5 size-3 shrink-0 text-ai" />
+
                         <span>
                           Risk level:{' '}
                           <span className="font-medium capitalize text-foreground">
@@ -1654,21 +1898,28 @@ export function AgentCommandCenter({
 
                       <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <CircleDot className="mt-0.5 size-3 shrink-0 text-ai" />
+
                         <span>
                           AI confidence:{' '}
                           <span className="font-medium text-foreground">
-                            {formatPercent(decisionExplanation.confidence)}
+                            {formatPercent(
+                              decisionExplanation.confidence,
+                            )}
                           </span>
                         </span>
                       </div>
 
                       <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <CircleDot className="mt-0.5 size-3 shrink-0 text-ai" />
-                        <span>{decisionExplanation.attemptText}</span>
+
+                        <span>
+                          {decisionExplanation.attemptText}
+                        </span>
                       </div>
 
                       <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <CircleDot className="mt-0.5 size-3 shrink-0 text-ai" />
+
                         <span>
                           Policy:{' '}
                           <span className="font-medium text-foreground">
@@ -1679,10 +1930,16 @@ export function AgentCommandCenter({
 
                       <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <CircleDot className="mt-0.5 size-3 shrink-0 text-ai" />
+
                         <span>
                           Recommended action:{' '}
                           <span className="font-medium text-foreground">
-                            {RECOVERY_ACTION_LABELS[decisionExplanation.action]}
+                            {
+                              RECOVERY_ACTION_LABELS[
+                                decisionExplanation
+                                  .action
+                              ]
+                            }
                           </span>
                         </span>
                       </div>
@@ -1693,6 +1950,7 @@ export function AgentCommandCenter({
                     <div className="mb-1 text-[10px] font-semibold tracking-wide text-ai uppercase">
                       AI Rationale
                     </div>
+
                     <p className="text-xs leading-relaxed text-muted-foreground">
                       {decisionExplanation.rationale}
                     </p>
@@ -1701,27 +1959,37 @@ export function AgentCommandCenter({
               )}
 
               {/* ALTERNATIVE ACTIONS */}
-              {featuredDecision.alternativeActions.length > 0 && (
+              {featuredDecision.alternativeActions.length >
+                0 && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   <span className="text-xs font-medium text-muted-foreground/70">
                     Alternatives considered:
                   </span>
-                  {featuredDecision.alternativeActions.map((action) => (
-                    <Badge key={action} variant="neutral">
-                      {RECOVERY_ACTION_LABELS[action]}
-                    </Badge>
-                  ))}
+
+                  {featuredDecision.alternativeActions.map(
+                    (action) => (
+                      <Badge
+                        key={action}
+                        variant="neutral"
+                      >
+                        {RECOVERY_ACTION_LABELS[action]}
+                      </Badge>
+                    ),
+                  )}
                 </div>
               )}
 
               {/* STAGE RESULTS: ACT / VERIFY / AUDIT */}
-              {(actResult || verifyResult || auditEvent) && (
+              {(actResult ||
+                verifyResult ||
+                auditEvent) && (
                 <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 text-xs sm:grid-cols-3">
                   {actResult && (
                     <div>
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Act
                       </div>
+
                       <div className="mt-0.5 text-muted-foreground">
                         {actResult.message}
                       </div>
@@ -1733,6 +2001,7 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Verify
                       </div>
+
                       <div className="mt-0.5 text-muted-foreground">
                         {verifyResult.message}
                       </div>
@@ -1744,8 +2013,10 @@ export function AgentCommandCenter({
                       <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         Audit
                       </div>
+
                       <div className="mt-0.5 text-muted-foreground">
-                        {auditEvent.action} · {auditEvent.timestamp}
+                        {auditEvent.action} ·{' '}
+                        {auditEvent.timestamp}
                       </div>
                     </div>
                   )}
@@ -1765,8 +2036,10 @@ export function AgentCommandCenter({
                 <TrendingUp className="size-4 text-ai" />
                 Recovery Probability
               </CardTitle>
+
               <CardDescription>
-                Model-estimated likelihood of recovering this payment.
+                Model-estimated likelihood of recovering this
+                payment.
               </CardDescription>
             </CardHeader>
 
@@ -1774,12 +2047,17 @@ export function AgentCommandCenter({
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <div className="text-4xl font-semibold tabular-nums text-foreground">
-                    {formatPercent(featuredPrediction.recoveryProbability)}
+                    {formatPercent(
+                      featuredPrediction.recoveryProbability,
+                    )}
                   </div>
+
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {featuredPrediction.recoveryProbability >= 0.75
+                    {featuredPrediction.recoveryProbability >=
+                    0.75
                       ? 'High likelihood of recovery'
-                      : featuredPrediction.recoveryProbability >= 0.5
+                      : featuredPrediction.recoveryProbability >=
+                          0.5
                         ? 'Moderate likelihood of recovery'
                         : 'Low likelihood of recovery'}
                   </div>
@@ -1789,6 +2067,7 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Model
                   </div>
+
                   <div className="font-mono text-xs text-muted-foreground">
                     {featuredPrediction.modelVersion}
                   </div>
@@ -1806,6 +2085,7 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Expected Recovery
                   </div>
+
                   <div className="mt-0.5 text-sm font-semibold tabular-nums text-success">
                     {formatCurrency(expectedRecovery)}
                   </div>
@@ -1815,6 +2095,7 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Risk Level
                   </div>
+
                   <div className="mt-0.5 text-sm font-semibold capitalize text-foreground">
                     {selectedPayment?.risk ?? '—'}
                   </div>
@@ -1824,8 +2105,9 @@ export function AgentCommandCenter({
                   <div className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                     Est. Confidence
                   </div>
+
                   <div className="mt-0.5 text-sm font-semibold tabular-nums text-ai">
-                    {formatPercent(featuredPrediction.confidence)}
+                    {formatPercent(confidence)}
                   </div>
                 </div>
               </div>
@@ -1835,15 +2117,17 @@ export function AgentCommandCenter({
                   Key Factors
                 </span>
 
-                {featuredPrediction.factors.map((factor, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-2 text-xs text-muted-foreground"
-                  >
-                    <CircleDot className="mt-0.5 size-3 shrink-0 text-ai/60" />
-                    <span>{factor}</span>
-                  </div>
-                ))}
+                {featuredPrediction.factors.map(
+                  (factor, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 text-xs text-muted-foreground"
+                    >
+                      <CircleDot className="mt-0.5 size-3 shrink-0 text-ai/60" />
+                      <span>{factor}</span>
+                    </div>
+                  ),
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1856,8 +2140,10 @@ export function AgentCommandCenter({
               <Lock className="size-4 text-ai" />
               Bounded Autonomy
             </CardTitle>
+
             <CardDescription>
-              AI acts within predefined financial and policy limits.
+              AI acts within predefined financial and policy
+              limits.
             </CardDescription>
           </CardHeader>
 
@@ -1865,6 +2151,7 @@ export function AgentCommandCenter({
             <div className="rounded-lg border border-success/25 bg-success-muted/30 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <ShieldCheck className="size-4 text-success" />
+
                 <span className="text-xs font-semibold tracking-wide text-success uppercase">
                   Autonomous Actions
                 </span>
@@ -1890,6 +2177,7 @@ export function AgentCommandCenter({
             <div className="rounded-lg border border-warning/25 bg-warning-muted/30 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <ShieldAlert className="size-4 text-warning" />
+
                 <span className="text-xs font-semibold tracking-wide text-warning uppercase">
                   Human Approval
                 </span>
@@ -1915,13 +2203,17 @@ export function AgentCommandCenter({
             <div className="rounded-lg border border-danger/25 bg-danger-muted/30 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <ShieldOff className="size-4 text-danger" />
+
                 <span className="text-xs font-semibold tracking-wide text-danger uppercase">
                   Blocked Actions
                 </span>
               </div>
 
               <ul className="space-y-1.5">
-                {['Out-of-policy actions', 'Unsafe interventions'].map((item) => (
+                {[
+                  'Out-of-policy actions',
+                  'Unsafe interventions',
+                ].map((item) => (
                   <li
                     key={item}
                     className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -1943,8 +2235,10 @@ export function AgentCommandCenter({
             <Cpu className="size-4 text-ai" />
             Decision Flow
           </CardTitle>
+
           <CardDescription>
-            How a payment failure becomes a bounded, audited recovery decision.
+            How a payment failure becomes a bounded, audited
+            recovery decision.
           </CardDescription>
         </CardHeader>
 
@@ -1952,22 +2246,36 @@ export function AgentCommandCenter({
           <div className="flex flex-col gap-0">
             {DECISION_FLOW.map((step, i) => {
               const Icon = step.icon
-              const isHovered = hoveredFlow === i
-              const isLast = i === DECISION_FLOW.length - 1
+              const isHovered =
+                hoveredFlow === i
+              const isLast =
+                i === DECISION_FLOW.length - 1
 
               return (
-                <div key={step.label} className="relative">
+                <div
+                  key={step.label}
+                  className="relative"
+                >
                   {!isLast && (
                     <div className="absolute top-12 left-5 h-full w-px bg-border" />
                   )}
 
-                  <Tooltip content={step.desc} side="right">
+                  <Tooltip
+                    content={step.desc}
+                    side="right"
+                  >
                     <div
-                      onMouseEnter={() => setHoveredFlow(i)}
-                      onMouseLeave={() => setHoveredFlow(null)}
+                      onMouseEnter={() =>
+                        setHoveredFlow(i)
+                      }
+                      onMouseLeave={() =>
+                        setHoveredFlow(null)
+                      }
                       className={cn(
                         'flex items-center gap-3 rounded-lg p-3 transition-all duration-200',
-                        isHovered ? '-mr-2 bg-ai-muted/30' : '',
+                        isHovered
+                          ? '-mr-2 bg-ai-muted/30'
+                          : '',
                       )}
                     >
                       <span
@@ -1985,11 +2293,14 @@ export function AgentCommandCenter({
                         <div
                           className={cn(
                             'text-sm font-semibold transition-colors',
-                            isHovered ? 'text-ai' : 'text-foreground',
+                            isHovered
+                              ? 'text-ai'
+                              : 'text-foreground',
                           )}
                         >
                           {step.label}
                         </div>
+
                         <div className="text-xs text-muted-foreground">
                           {step.desc}
                         </div>
@@ -2010,13 +2321,18 @@ export function AgentCommandCenter({
             <span className="flex size-7 items-center justify-center rounded-lg bg-ai-muted text-ai">
               <Eye className="size-3.5" />
             </span>
+
             <span className="text-[11px] font-medium text-muted-foreground">
               Payments Analyzed
             </span>
           </div>
+
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {liveStats.paymentsAnalyzed.toLocaleString('en-IN')}
+            {liveStats.paymentsAnalyzed.toLocaleString(
+              'en-IN',
+            )}
           </div>
+
           <div className="mt-1 text-[10px] tracking-wide text-muted-foreground/70 uppercase">
             Demo metric
           </div>
@@ -2027,13 +2343,18 @@ export function AgentCommandCenter({
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary/12 text-primary">
               <Brain className="size-3.5" />
             </span>
+
             <span className="text-[11px] font-medium text-muted-foreground">
               Recovery Decisions
             </span>
           </div>
+
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {liveStats.aiActionsExecuted.toLocaleString('en-IN')}
+            {liveStats.aiActionsExecuted.toLocaleString(
+              'en-IN',
+            )}
           </div>
+
           <div className="mt-1 text-[10px] tracking-wide text-muted-foreground/70 uppercase">
             Demo metric
           </div>
@@ -2044,13 +2365,18 @@ export function AgentCommandCenter({
             <span className="flex size-7 items-center justify-center rounded-lg bg-success-muted text-success">
               <CheckCircle2 className="size-3.5" />
             </span>
+
             <span className="text-[11px] font-medium text-muted-foreground">
               Successful Recoveries
             </span>
           </div>
+
           <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
-            {liveStats.successfulRecoveries.toLocaleString('en-IN')}
+            {liveStats.successfulRecoveries.toLocaleString(
+              'en-IN',
+            )}
           </div>
+
           <div className="mt-1 text-[10px] tracking-wide text-muted-foreground/70 uppercase">
             Demo metric
           </div>
@@ -2061,13 +2387,18 @@ export function AgentCommandCenter({
             <span className="flex size-7 items-center justify-center rounded-lg bg-success-muted text-success">
               <TrendingUp className="size-3.5" />
             </span>
+
             <span className="text-[11px] font-medium text-muted-foreground">
               Revenue Recovered
             </span>
           </div>
+
           <div className="mt-3 text-2xl font-semibold tabular-nums text-success">
-            {formatCompactCurrency(liveStats.revenueRecovered)}
+            {formatCompactCurrency(
+              liveStats.revenueRecovered,
+            )}
           </div>
+
           <div className="mt-1 text-[10px] tracking-wide text-muted-foreground/70 uppercase">
             Demo metric
           </div>
@@ -2077,7 +2408,11 @@ export function AgentCommandCenter({
   )
 }
 
-function PolicyStatus({ evaluation }: { evaluation?: PolicyEvaluation }) {
+function PolicyStatus({
+  evaluation,
+}: {
+  evaluation?: PolicyEvaluation
+}) {
   if (!evaluation) {
     return (
       <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-success">
@@ -2113,6 +2448,56 @@ function PolicyStatus({ evaluation }: { evaluation?: PolicyEvaluation }) {
   )
 }
 
+/*
+ * APPROVAL STATUS SOURCE OF TRUTH
+ *
+ * Policy evaluation is authoritative once it exists.
+ * This prevents a stale decision-level requiresApproval flag
+ * from overriding the current policy verdict.
+ *
+ * PL-01 -> Allowed -> Not required
+ * PL-02 -> Approval required -> Required
+ * PL-05 -> Blocked -> Blocked
+ */
+function ApprovalStatusDisplay({
+  evaluation,
+}: {
+  evaluation?: PolicyEvaluation
+}) {
+  if (!evaluation) {
+    return (
+      <div className="mt-1 text-lg font-semibold text-muted-foreground">
+        Pending
+      </div>
+    )
+  }
+
+  if (evaluation.blocked) {
+    return (
+      <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-danger">
+        <ShieldOff className="size-4" />
+        Blocked
+      </div>
+    )
+  }
+
+  if (evaluation.requiresApproval) {
+    return (
+      <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-warning">
+        <ShieldAlert className="size-4" />
+        Required
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-success">
+      <ShieldCheck className="size-4" />
+      Not required
+    </div>
+  )
+}
+
 function StageExtras({
   snapshot,
   policyEvaluation,
@@ -2120,7 +2505,8 @@ function StageExtras({
   snapshot: RecoveryStageSnapshot
   policyEvaluation?: PolicyEvaluation
 }) {
-  const evaluation = snapshot.policyEvaluation ?? policyEvaluation
+  const evaluation =
+    snapshot.policyEvaluation ?? policyEvaluation
 
   return (
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
@@ -2128,7 +2514,9 @@ function StageExtras({
         <span>
           Probability{' '}
           <span className="font-medium text-foreground">
-            {formatPercent(snapshot.prediction.recoveryProbability)}
+            {formatPercent(
+              snapshot.prediction.recoveryProbability,
+            )}
           </span>
         </span>
       )}
@@ -2147,9 +2535,15 @@ function StageExtras({
         <span>
           Approval{' '}
           <span className="font-medium text-foreground">
-            {evaluation?.requiresApproval || snapshot.decision.requiresApproval
-              ? 'required'
-              : 'not required'}
+            {evaluation?.blocked
+              ? 'blocked'
+              : evaluation
+                ? evaluation.requiresApproval
+                  ? 'required'
+                  : 'not required'
+                : snapshot.decision.requiresApproval
+                  ? 'required'
+                  : 'not required'}
           </span>
         </span>
       )}
@@ -2200,9 +2594,17 @@ function SummaryRow({
       <span className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
         {label}
       </span>
-      <span className={cn('text-sm font-medium', mono && 'font-mono', toneClass)}>
+
+      <span
+        className={cn(
+          'text-sm font-medium',
+          mono && 'font-mono',
+          toneClass,
+        )}
+      >
         {value}
       </span>
     </div>
   )
 }
+

@@ -1641,7 +1641,7 @@ export function AgentCommandCenter({
                     </button>
 
                     {isOpen && (
-                      <div className="ml-[42px] flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-[11px] text-muted-foreground">
+                      <div className="ml-10.5 flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-[11px] text-muted-foreground">
                         {event.paymentId && (
                           <span>
                             Payment{' '}

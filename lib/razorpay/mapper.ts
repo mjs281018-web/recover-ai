@@ -147,7 +147,7 @@ function getRecommendedAction(
     return 'hold'
   }
 
-  if (amount > 10000 || risk === 'high') {
+  if (amount > 10000) {
     return 'human-approval'
   }
 

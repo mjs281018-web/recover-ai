@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useRef, useState } from 'react'
 import {
@@ -406,8 +406,8 @@ export function AgentCommandCenter({
   )
 
   const selectedPayment =
-    latestOf(snapshots, (s) => (s.paymentId === selectedPaymentId ? s.payment : undefined)) ??
     availablePayments.find((p) => p.id === selectedPaymentId) ??
+    latestOf(snapshots, (s) => (s.paymentId === selectedPaymentId ? s.payment : undefined)) ??
     availablePayments[0]
 
   const featuredDecision =
